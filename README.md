@@ -1,5 +1,9 @@
 # Databricks Academy
 
+🌎 **Idioma / Language:** [🇧🇷 Português](#-português) | [🇺🇸 English](#-english)
+
+---
+
 ## 🇧🇷 Português
 
 **Databricks Academy** é uma apostila interativa e plataforma de estudos focada no ecossistema **Databricks**, construída inteiramente em HTML, CSS e JavaScript puro (sem dependências de build).
@@ -8,14 +12,26 @@ O projeto combina aulas estruturadas (Lakehouse, Delta Lake, PySpark, Spark SQL,
 
 🔗 **Demo / Acesso:** [https://rehkkj.github.io/Databricks-Project-Academy/](https://rehkkj.github.io/Databricks-Project-Academy/)
 
-### Principais recursos
-- **Aulas & Prática:** Questões de múltipla escolha e desafios de código com execução em Python isolado no navegador (via Pyodide / Web Worker).
-- **Tutor de IA (Datrics):** Chat flutuante contextualizado, ajuste de profundidade das explicações (*ELI5*, *Pleno*, *Arquiteto*), diagnóstico de erros, geração de questões e suporte a múltiplos provedores (Gemini, OpenRouter, Groq, Cloudflare Workers AI, NVIDIA NIM, Cohere, Z.AI, SambaNova Cloud and Mistral Studio).
-- **Ferramentas de Estudo:** Mapa mental interativo exportável em SVG/PNG, matriz de *skills* com mapa de calor por aula, laboratório de limpeza de dados sujos e sistema de trechos/questões marcadas.
-- **Personalização & Editor:** Editor visual integrado para gerenciar aulas, temas (claro/escuro), paletas, tipografia e backup local/criptografado das configurações[cite: 2].
+### Principais Recursos
 
-### Como executar
-Por ser uma aplicação estática pura, basta abrir o arquivo `index.html` diretamente no navegador ou hospedar a pasta em qualquer servidor estático (como GitHub Pages ou Live Server)[cite: 2].
+* **Página Inicial & Navegação:** Apresenta os principais recursos da plataforma com atalhos diretos para a trilha de estudos, Radar de Skills, laboratório de limpeza de dados (SQL e Python), Datrics, modo *Ensine o Estagiário*, mapas mentais e Editor.
+* **Trilha de Estudos & Prática:** 4 módulos e 12 aulas aprofundadas contendo cards de estudo, questões de múltipla escolha e desafios de código com execução em Python isolado no navegador (via Pyodide / Web Worker).
+* **Tutor de IA (Datrics):** Chat flutuante contextualizado com ajuste de profundidade das explicações (*ELI5*, *Pleno*, *Arquiteto*), diagnóstico de erros, geração de questões e *fallback* automático entre múltiplos provedores (Gemini, OpenRouter, Groq, Cloudflare Workers AI, NVIDIA NIM, Cohere, Z.AI, SambaNova Cloud e Mistral Studio).
+* **Mapas Mentais com Pesquisa Web:** Criador de mapas mentais interativos exportáveis em SVG/PNG. Consulta a web antes de cada criação ou alteração para fundamentar afirmações factuais, salvando e exibindo os links e trechos na seção *"Fontes consultadas na web"*.
+* **Ferramentas de Estudo:** Matriz e Radar de *Skills* com mapa de calor por aula, laboratório de limpeza de dados sujos, dinâmica *Ensine o Estagiário* e sistema de marcação para trechos e questões.
+* **Personalização & Editor Visual:** Editor integrado para gerenciar aulas, identidade visual (temas claro/escuro, paletas de cores e tipografia) e backup local/criptografado das configurações e chaves de API.
+
+### Como Executar
+
+Por ser uma aplicação estática pura, basta abrir o arquivo `index.html` diretamente em qualquer navegador moderno ou hospedar a pasta em um servidor estático (como GitHub Pages ou a extensão Live Server do VS Code).
+
+### Atualizações Recentes (Changelog)
+
+#### 20/11/2026 — Nova Trilha e Melhorias no Datrics
+* **Reestruturação da Trilha:** A trilha padrão foi recriada em **4 módulos e 12 aulas** (totalizando 36 questões e 24 cards de estudo) seguindo o formato estruturado do Datrics. Na primeira abertura desta versão, o progresso antigo é migrado/substituído uma única vez, preservando temas, configurações, chaves de API e backups.
+* **Geração de Módulos e Questões:** Múltipla escolha definida como padrão para evitar falhas de validação em exercícios de código automáticos. Reconhecimento de Python/Pandas/NumPy/Matplotlib/Jupyter como domínio próprio (sem forçar contexto Databricks) e parser/validação mais flexíveis, garantindo o salvamento da aula mesmo se a API falhar na geração de questões.
+* **Mapas Mentais Verificados:** Inclusão de pesquisa web obrigatória antes da geração/edição de mapas mentais, compartilhando o contexto com os provedores de *fallback* e bloqueando a criação caso nenhuma fonte confiável seja recuperada.
+* **Interface:** Área de toque ampliada e melhor alinhamento no botão de fechar do Datrics em telas estreitas, além de avisos recomendando backup antes de edições estruturais no Editor.
 
 ---
 
@@ -23,41 +39,27 @@ Por ser uma aplicação estática pura, basta abrir o arquivo `index.html` diret
 
 **Databricks Academy** is an interactive study guide and learning platform focused on the **Databricks** ecosystem, built entirely with vanilla HTML, CSS, and JavaScript (zero build steps required).
 
-It pairs concise lessons (Lakehouse, Delta Lake, PySpark, Spark SQL, Auto Loader, Unity Catalog, and Workflows) with instant-feedback exercises, a data cleaning lab, and an integrated AI tutor (*Datrics*) supporting multiple free-tier providers via BYOK (*Bring Your Own Key*).
+It pairs structured lessons (Lakehouse, Delta Lake, PySpark, Spark SQL, Auto Loader, Unity Catalog, and Workflows) with instant-feedback exercises, a data cleaning lab, and an integrated AI tutor (*Datrics*) supporting multiple free-tier providers via BYOK (*Bring Your Own Key*).
 
 🔗 **Live Demo:** [https://rehkkj.github.io/Databricks-Project-Academy/](https://rehkkj.github.io/Databricks-Project-Academy/)
 
 ### Key Features
-- **Lessons & Hands-on Practice:** Multiple-choice questions and coding challenges executed safely in the browser using an isolated Python environment (Pyodide via Web Worker).
-- **AI Tutor (Datrics):** Context-aware floating assistant with adjustable explanation depth (*ELI5*, *Mid-level*, *Architect*), error diagnostics, custom question generation, and automatic fallback across multiple providers (Gemini, OpenRouter, Groq, Cloudflare Workers AI, NVIDIA NIM, Cohere, Z.AI, SambaNova Cloud and Mistral Studio).
-- **Study Tools:** Interactive mind maps exportable to SVG/PNG, skill radar and lesson heatmaps, a dirty-data laboratory, and bookmarking for snippets and exercises.
-- **Customization & Built-in Editor:** Live content and theme editor (light/dark modes, color palettes, typography) with encrypted backup support for API keys and local progress[cite: 2].
+
+* **Home Dashboard & Navigation:** Showcases core platform capabilities with direct shortcuts to the learning path, Skill Radar, SQL & Python data cleaning lab, Datrics, *Teach the Intern* mode, mind maps, and the built-in Editor.
+* **Learning Path & Hands-on Practice:** 4 modules and 12 in-depth lessons featuring study cards, multiple-choice questions, and coding challenges executed safely in the browser using an isolated Python environment (Pyodide via Web Worker).
+* **AI Tutor (Datrics):** Context-aware floating assistant with adjustable explanation depth (*ELI5*, *Mid-level*, *Architect*), error diagnostics, custom question generation, and automatic fallback across multiple providers (Gemini, OpenRouter, Groq, Cloudflare Workers AI, NVIDIA NIM, Cohere, Z.AI, SambaNova Cloud, and Mistral Studio).
+* **Web-Grounded Mind Maps:** Interactive mind map generator exportable to SVG/PNG. Queries the web prior to every creation or edit to ground factual claims, saving and displaying source links and snippets under *"Web Sources Consulted"*.
+* **Study Tools:** Skill Radar and lesson heatmaps, a dirty-data cleaning laboratory, *Teach the Intern* active-recall mode, and bookmarking for code snippets and exercises.
+* **Customization & Built-in Editor:** Live content and visual identity editor (light/dark modes, color palettes, typography) with encrypted local backup support for API keys, custom lessons, and progress.
 
 ### Getting Started
-Since this is a pure static web app, simply open `index.html` in any modern browser or serve the folder via any static host (such as GitHub Pages or VS Code Live Server)[cite: 2].
 
-## Correção do Datrics — geração de módulos
+Since this is a pure static web app, simply open `index.html` in any modern browser or serve the folder via any static host (such as GitHub Pages or VS Code Live Server).
 
-- Geração de questões de módulos usa múltipla escolha como formato padrão, evitando alternância automática para exercícios de código que podia falhar na validação.
-- Reconhecimento de Python/Pandas/NumPy/Matplotlib/Jupyter como domínio Python.
-- Prompts e texto de aula adaptados ao assunto, sem forçar contexto Databricks em módulos de Python.
-- Parser de questões aceita respostas em arrays e objetos com chaves comuns (`questions`, `questoes`, `items`, `exercises` etc.).
-- Validação aceita índice numérico da alternativa correta e campos equivalentes em respostas de exercícios de código.
-- Se a API não produzir questões válidas após novas tentativas, a aula e o módulo ainda são salvos, com aviso, em vez de abortar toda a criação.
+### Recent Updates (Changelog)
 
-
-## Atualização da trilha (20/11/2026)
-
-- A trilha padrão foi recriada em 4 módulos e 12 aulas.
-- Cada aula inclui conteúdo aprofundado, 3 questões e 2 cards de estudo (36 questões e 24 cards no total).
-- O conteúdo segue o formato estruturado usado pelo Datrics e a renderização padrão da apostila.
-- Na primeira abertura desta versão, a trilha antiga e seu progresso/estatísticas/marcações são substituídos uma única vez. Temas, configurações, chaves de API e backups salvos são preservados.
-- O botão de fechar do Datrics agora tem área de toque ampliada e permanece alinhado ao cabeçalho em telas estreitas.
-
-
-## Pesquisa obrigatória nos mapas mentais
-
-O criador de mapas mentais consulta a web antes de cada criação ou alteração. Os resultados são incorporados ao contexto de geração sem remover as instruções editoriais e pedagógicas já existentes. A IA deve basear afirmações factuais nas fontes consultadas, sinalizar lacunas e não inventar referências. Os links e trechos de fontes ficam salvos junto ao mapa e são exibidos em "Fontes consultadas na web". Se nenhuma fonte puder ser recuperada, o sistema interrompe a criação em vez de produzir um mapa factual sem verificação. A consulta é feita uma vez por pedido e o mesmo contexto é compartilhado com os provedores de IA usados no fallback.
-
-## Apresentação da página inicial
-A página inicial apresenta os principais recursos da Academy com atalhos diretos para a trilha, Radar de Skills, laboratório de limpeza de dados com SQL e Python, Datrics, Ensine o Estagiário, mapas mentais e Editor. O bloco de edição explica que é possível personalizar a identidade visual e o conteúdo didático, além de recomendar backup antes de alterações importantes.
+#### 2026-11-20 — New Curriculum & Datrics Improvements
+* **Curriculum Overhaul:** Recreated the default learning path into **4 modules and 12 lessons** (36 questions and 24 study cards total) matching Datrics' structured format. On first launch of this version, legacy progress and bookmarks are reset once while preserving saved themes, settings, API keys, and backups.
+* **Module & Question Generation:** Set multiple-choice as the default format to prevent validation failures in auto-generated coding tasks. Added native domain recognition for Python/Pandas/NumPy/Matplotlib/Jupyter (without forcing Databricks context), broadened JSON parser/validation rules, and ensured lessons save safely with a warning even if question generation fails after retries.
+* **Fact-Checked Mind Maps:** Enforced mandatory web search prior to generating or updating mind maps, sharing retrieved context across fallback providers and halting generation if no verifiable sources can be retrieved.
+* **UI & UX Refinements:** Enlarged touch target and fixed header alignment for the Datrics close button on narrow screens, and added backup recommendations before major changes in the Editor.
