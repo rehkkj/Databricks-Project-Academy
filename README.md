@@ -21,10 +21,6 @@ O projeto combina aulas estruturadas (Lakehouse, Delta Lake, PySpark, Spark SQL,
 * **Ferramentas de Estudo:** Matriz e Radar de *Skills* com mapa de calor por aula, laboratório de limpeza de dados sujos, dinâmica *Ensine o Estagiário* e sistema de marcação para trechos e questões.
 * **Personalização & Editor Visual:** Editor integrado para gerenciar aulas, identidade visual (temas claro/escuro, paletas de cores e tipografia) e backup local/criptografado das configurações e chaves de API.
 
-### Como Executar
-
-Por ser uma aplicação estática pura, basta abrir o arquivo `index.html` diretamente em qualquer navegador moderno ou hospedar a pasta em um servidor estático (como GitHub Pages ou a extensão Live Server do VS Code).
-
 ### Atualizações Recentes (Changelog)
 
 #### 20/11/2026 — Nova Trilha e Melhorias no Datrics
@@ -51,10 +47,6 @@ It pairs structured lessons (Lakehouse, Delta Lake, PySpark, Spark SQL, Auto Loa
 * **Web-Grounded Mind Maps:** Interactive mind map generator exportable to SVG/PNG. Queries the web prior to every creation or edit to ground factual claims, saving and displaying source links and snippets under *"Web Sources Consulted"*.
 * **Study Tools:** Skill Radar and lesson heatmaps, a dirty-data cleaning laboratory, *Teach the Intern* active-recall mode, and bookmarking for code snippets and exercises.
 * **Customization & Built-in Editor:** Live content and visual identity editor (light/dark modes, color palettes, typography) with encrypted local backup support for API keys, custom lessons, and progress.
-
-### Getting Started
-
-Since this is a pure static web app, simply open `index.html` in any modern browser or serve the folder via any static host (such as GitHub Pages or VS Code Live Server).
 
 ### Recent Updates (Changelog)
 
