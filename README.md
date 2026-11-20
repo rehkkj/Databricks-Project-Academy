@@ -58,3 +58,6 @@ Since this is a pure static web app, simply open `index.html` in any modern brow
 ## Pesquisa obrigatória nos mapas mentais
 
 O criador de mapas mentais consulta a web antes de cada criação ou alteração. Os resultados são incorporados ao contexto de geração sem remover as instruções editoriais e pedagógicas já existentes. A IA deve basear afirmações factuais nas fontes consultadas, sinalizar lacunas e não inventar referências. Os links e trechos de fontes ficam salvos junto ao mapa e são exibidos em "Fontes consultadas na web". Se nenhuma fonte puder ser recuperada, o sistema interrompe a criação em vez de produzir um mapa factual sem verificação. A consulta é feita uma vez por pedido e o mesmo contexto é compartilhado com os provedores de IA usados no fallback.
+
+## Apresentação da página inicial
+A página inicial apresenta os principais recursos da Academy com atalhos diretos para a trilha, Radar de Skills, laboratório de limpeza de dados com SQL e Python, Datrics, Ensine o Estagiário, mapas mentais e Editor. O bloco de edição explica que é possível personalizar a identidade visual e o conteúdo didático, além de recomendar backup antes de alterações importantes.
