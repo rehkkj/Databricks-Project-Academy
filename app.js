@@ -1481,7 +1481,7 @@ const laboratorio = (() => {
 
 /* ---------- 20. Editor do site ---------- */
 const editor = (() => {
-  const E = { aba: "overview", mi: 0, aulaId: "", qi: 0, sujo: false };
+  const E = { aba: "overview", mi: 0, aulaId: "", qi: 0, sujo: false, temasImportados: [] };
   const ABAS = [["overview", "Visão geral"], ["modules", "Módulos"], ["lessons", "Aulas"], ["questions", "Questões"], ["appearance", "Aparência"], ["ai", "Personalizar IA"], ["backup", "Backup e modos"]];
   const opt = (v, rot, sel) => '<option value="' + esc(v) + '"' + (sel ? " selected" : "") + ">" + esc(rot) + "</option>";
   const pegar = (obj, cam) => cam.split(".").reduce((o, k) => o == null ? o : o[k], obj);
@@ -1604,7 +1604,10 @@ const editor = (() => {
         '<div class="linha-btns"><button type="button" class="btn btn-tinta" data-acao="modo-salvar">Salvar modo atual</button><button type="button" class="btn" data-acao="modo-atualizar">Atualizar selecionado</button><button type="button" class="btn" data-acao="modo-ativar">Ativar selecionado</button><button type="button" class="btn" data-acao="modo-exportar">Exportar</button><label class="btn">Importar modo<input type="file" accept=".json,application/json" data-importar-modo hidden></label><button type="button" class="btn btn-perigo" data-acao="modo-apagar">Excluir</button></div></section>' +
       '<section class="editor-bloco"><h3>Temas de aparência</h3><p class="mini discreto">Guarde combinações de cores, fontes e efeitos para alternar depois. Até ' + LIMITE_TEMAS + " temas.</p>" +
         '<div class="grade-2"><label class="campo"><span>Temas salvos</span><select id="edTema">' + opt("", S.temasSalvos.length ? "Escolha um tema" : "Nenhum tema salvo", !temaSel) + S.temasSalvos.map((t) => opt(t.id, t.name, t.id === temaSel)).join("") + '</select></label><label class="campo"><span>Nome do tema</span><input type="text" id="edTemaNome" maxlength="48"></label></div>' +
-        '<div class="linha-btns"><button type="button" class="btn btn-tinta" data-acao="tema-salvar">Salvar aparência como tema</button><button type="button" class="btn" data-acao="tema-aplicar">Aplicar</button><button type="button" class="btn" data-acao="tema-atualizar">Atualizar selecionado</button><button type="button" class="btn btn-perigo" data-acao="tema-apagar">Excluir</button></div></section>' +
+        '<div class="linha-btns"><button type="button" class="btn btn-tinta" data-acao="tema-salvar">Salvar aparência como tema</button><button type="button" class="btn" data-acao="tema-aplicar">Aplicar</button><button type="button" class="btn" data-acao="tema-atualizar">Atualizar selecionado</button><button type="button" class="btn btn-perigo" data-acao="tema-apagar">Excluir</button></div>' +
+        '<div class="editor-bloco tema-importacao"><h4>Importar temas de outro backup</h4><p class="mini discreto">Escolha um backup A ou B e selecione somente os temas que deseja trazer. Seus módulos, aulas, questões, progresso e aparência atual não serão alterados.</p>' +
+        '<label class="btn">Escolher backup JSON<input type="file" accept=".json,application/json" data-importar-temas hidden></label>' +
+        '<div id="temaImportPreview" aria-live="polite">' + (E.temasImportados.length ? renderizarPreviaTemas() : '<p class="mini discreto">Nenhum arquivo selecionado.</p>') + '</div></div></section>' +
       '<section class="editor-bloco"><h3>Backup completo</h3><p class="mini discreto">Conteúdo, progresso, estatísticas, aparência e temas em um arquivo .json. Chaves de API ficam de fora (elas têm backup criptografado próprio no gerador de questões). Backups da versão anterior da apostila também são aceitos.</p>' +
         '<div class="linha-btns"><button type="button" class="btn btn-tinta" data-acao="backup-baixar">Baixar backup completo</button><label class="btn">Importar arquivo<input type="file" accept=".json,application/json" data-importar-backup hidden></label></div>' +
         '<label class="campo secao"><span>Ou cole o JSON do backup</span><textarea id="edBackupTexto" rows="5" class="mono"></textarea></label><button type="button" class="btn" data-acao="backup-colar">Validar e importar o JSON acima</button></section>' +
@@ -1737,6 +1740,51 @@ const editor = (() => {
       S.modos.push(m); if (gravarModos()) aviso("Modo \"" + m.name + "\" importado. Ative-o quando quiser."); E.modoSel = m.id; redesenhar();
     } catch (err) { aviso(/JSON/.test(err.message) ? "O arquivo não é um JSON válido." : err.message, true); }
   }
+  function renderizarPreviaTemas() {
+    const lista = E.temasImportados || [];
+    if (!lista.length) return '<p class="mini discreto">Nenhum tema encontrado nesse arquivo.</p>';
+    const duplicados = lista.filter((x) => S.temasSalvos.some((t) => t.name.toLowerCase() === x.name.toLowerCase())).length;
+    return '<div class="tema-import-lista"><p class="mini">' + lista.length + ' tema(s) encontrado(s). Marque os que deseja importar' + (duplicados ? ' · ' + duplicados + ' com nome já existente' : '') + '.</p>' +
+      lista.map((t, i) => '<label class="tema-import-item"><input type="checkbox" data-tema-import-index="' + i + '" checked><span><strong>' + esc(t.name) + '</strong><small>' + (t.currentTheme === 'dark' ? 'Tema escuro' : 'Tema claro') + '</small></span></label>').join('') +
+      '<div class="linha-btns"><button type="button" class="btn btn-tinta" data-acao="tema-importar-selecionados">Importar temas selecionados</button><button type="button" class="btn" data-acao="tema-importar-cancelar">Cancelar</button></div></div>';
+  }
+  async function prepararImportacaoTemas(file) {
+    if (!file) return;
+    try {
+      const d = JSON.parse(await lerArquivo(file));
+      let lista = Array.isArray(d) ? d : (d && Array.isArray(d.themes) ? d.themes : null);
+      const formatos = ['apostila-databricks-backup', 'databricks-site-mode'];
+      if (!lista || (!Array.isArray(d) && (!formatos.includes(d.format) || d.version !== 1))) throw new Error('Selecione um backup completo ou arquivo de modo compatível (.json).');
+      const validos = lista.map(normTema).filter(Boolean);
+      if (!validos.length) throw new Error('Esse arquivo não contém temas válidos.');
+      if (validos.length > 100) throw new Error('O arquivo contém temas demais para importar de uma vez (máximo: 100).');
+      E.temasImportados = validos;
+      const preview = $('#temaImportPreview'); if (preview) preview.innerHTML = renderizarPreviaTemas();
+      aviso(validos.length + ' tema(s) encontrado(s). Selecione os que deseja importar.');
+    } catch (err) { E.temasImportados = []; const preview = $('#temaImportPreview'); if (preview) preview.innerHTML = '<p class="mini discreto">Nenhum arquivo selecionado.</p>'; aviso(err.message || 'Não foi possível ler o arquivo.', true); }
+  }
+  function importarTemasSelecionados() {
+    const marcados = $$('[data-tema-import-index]:checked').map((el) => E.temasImportados[Number(el.dataset.temaImportIndex)]).filter(Boolean);
+    if (!marcados.length) return aviso('Marque pelo menos um tema para importar.', true);
+    const espaco = LIMITE_TEMAS - S.temasSalvos.length;
+    if (espaco <= 0) return aviso('Você já atingiu o limite de ' + LIMITE_TEMAS + ' temas salvos.', true);
+    const antes = clone(S.temasSalvos); let adicionados = 0, ignorados = 0;
+    for (const original of marcados) {
+      const tema = normTema(original); if (!tema) { ignorados++; continue; }
+      const existeIgual = S.temasSalvos.some((x) => x.currentTheme === tema.currentTheme && JSON.stringify(x.settings) === JSON.stringify(tema.settings));
+      if (existeIgual) { ignorados++; continue; }
+      if (S.temasSalvos.length >= LIMITE_TEMAS) break;
+      tema.id = idLocal('tema');
+      const base = tema.name; let nome = base, n = 2;
+      while (S.temasSalvos.some((x) => x.name.toLowerCase() === nome.toLowerCase())) nome = (base.slice(0, 43) + ' ' + n++).slice(0, 48);
+      tema.name = nome; S.temasSalvos.push(tema); adicionados++;
+    }
+    if (!adicionados) return aviso('Nenhum tema novo foi adicionado: os selecionados já existem ou são iguais aos salvos.', true);
+    if (!gravarTemas()) { S.temasSalvos = antes; return aviso('Não foi possível salvar os temas. Libere espaço no armazenamento e tente novamente.', true); }
+    E.temasImportados = []; E.temaSel = '';
+    aviso(adicionados + ' tema(s) importado(s)' + (ignorados ? ' · ' + ignorados + ' duplicado(s) ignorado(s)' : '') + '. Seu conteúdo e progresso foram preservados.');
+    redesenhar();
+  }
   function acaoTema(acao) {
     const sel = $("#edTema").value; const nome = $("#edTemaNome").value.trim().slice(0, 48); const t = S.temasSalvos.find((x) => x.id === sel);
     if (acao === "tema-salvar") {
@@ -1800,6 +1848,8 @@ const editor = (() => {
         case "padrao-ia": if (confirm("Restaurar o visual padrão do Datrics?")) { S.ajustes.ai = clone(AJUSTES_PADRAO.ai); salvarAjustes("Datrics restaurado."); redesenhar(); } return;
         case "modo-salvar": case "modo-atualizar": case "modo-ativar": case "modo-exportar": case "modo-apagar": return acaoModo(d.acao);
         case "tema-salvar": case "tema-aplicar": case "tema-atualizar": case "tema-apagar": return acaoTema(d.acao);
+        case "tema-importar-selecionados": return importarTemasSelecionados();
+        case "tema-importar-cancelar": E.temasImportados = []; return redesenhar();
         case "backup-baixar": return baixarBackup();
         case "backup-colar": return importarBackup($("#edBackupTexto").value);
         case "zerar-progresso": if (confirm("Apagar todo o progresso e as estatísticas? O conteúdo fica.")) { S.progresso = {}; S.stats = {}; armazem.apagar(K.progresso); armazem.apagar(K.stats); aviso("Progresso zerado."); } return;
@@ -1829,6 +1879,7 @@ const editor = (() => {
       if (el.matches("[data-importar-questoes]")) return importarQuestoes(el.files[0]);
       if (el.matches("[data-importar-modo]")) return importarModo(el.files[0]);
       if (el.matches("[data-importar-backup]")) { lerArquivo(el.files[0]).then((t) => { $("#edBackupTexto").value = t; importarBackup(t); }, (err) => aviso(err.message, true)); return; }
+      if (el.matches("[data-importar-temas]")) { prepararImportacaoTemas(el.files[0]); el.value = ""; return; }
       if (el.id === "edModo") E.modoSel = el.value;
       if (el.id === "edTema") E.temaSel = el.value;
     };

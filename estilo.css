@@ -643,3 +643,13 @@ output { color: var(--tinta-3); font-size: 0.78rem; }
   .rota-entrando, [data-reveal], .rota h1.revelado, .rota h2.revelado, .rota .abertura h1, .rota .olho { animation: none !important; transition: none !important; opacity: 1 !important; transform: none !important; filter: none !important; clip-path: none !important; }
   .rota a:hover, .rota button:hover, .rota .btn:hover, .rota .questao:hover, .rota .cartao:hover, .rota .card:hover, .rota .painel:hover { transform: none !important; }
 }
+
+/* Importação seletiva de temas de backup */
+.tema-importacao { margin-top: 18px; padding: 16px; border: 1px solid var(--linha); border-radius: var(--raio); background: var(--superficie-2, transparent); }
+.tema-importacao h4 { margin: 0 0 6px; }
+.tema-import-lista { margin-top: 12px; }
+.tema-import-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin: 6px 0; border: 1px solid var(--linha); border-radius: 8px; cursor: pointer; transition: background-color 180ms ease, border-color 180ms ease; }
+.tema-import-item:hover { background: var(--brasa-fundo); border-color: var(--brasa); }
+.tema-import-item input { accent-color: var(--brasa); }
+.tema-import-item span { display: grid; gap: 2px; }
+.tema-import-item small { color: var(--tinta-2); font-size: .78rem; }
