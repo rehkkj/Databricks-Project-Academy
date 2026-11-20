@@ -222,13 +222,18 @@ async function pedir(req) {
       try {
         const r = await chamarFn(c.id, c.model, Object.assign({}, req, { messages: mensagens, max_tokens: max }), sinal);
         reducao = 0;
-        if (r.cortado && !req.json) {
+        if (r.cortado) {
           acumulado = juntar(acumulado, r.texto); rodadas++;
           evento("continue", { from: c.id, fromModel: c.model, label: req.rotulo });
-          if (rodadas >= 4) return finalizar(acumulado + MARCA_CORTE, c, chaveCache, req);
+          if (rodadas >= 4) {
+            // Não devolve JSON parcial como se fosse uma resposta válida.
+            throw new Error("A resposta continuou sendo cortada após quatro tentativas de continuação.");
+          }
           evitar = c.id; continue;
         }
-        const texto = req.json ? r.texto + (r.cortado ? MARCA_CORTE : "") : juntar(acumulado, r.texto);
+        // Em respostas JSON, a continuação precisa ser concatenada ao trecho inicial
+        // antes da validação; validar apenas o último fragmento causa falso erro de JSON incompleto.
+        const texto = juntar(acumulado, r.texto);
         if (req.validar) req.validar(texto);
         return finalizar(texto, c, chaveCache, req, erros.length);
       } catch (err) {
@@ -416,7 +421,7 @@ async function avaliarCodigo({ q, codigo }) {
   const d = objetoJson(r);
   return { correct: d.correct, feedback: String(d.feedback || "").slice(0, 600) };
 }
-const tokensMapa = (r, s) => Math.min(7000, 700 + r * (45 + s * 30));
+const tokensMapa = (r, s) => Math.min(10000, 1100 + r * (90 + s * 75));
 function lerMapa(texto, raiz) {
   const t = limparFences(texto);
   try { const m = App.normalizarMapa(objetoJson(t), raiz); if (m) return { mapa: m, parcial: texto.includes(MARCA_CORTE) }; } catch (e) { /* tenta salvar */ }
@@ -434,15 +439,50 @@ function lerMapa(texto, raiz) {
   if (!m) throw new Error("Não foi possível aproveitar nenhuma ramificação da resposta.");
   return { mapa: m, parcial: true };
 }
-async function mapaMental({ tema, foco, ramos, sub, aoStatus }) {
-  const sis = 'Retorne exclusivamente um objeto JSON válido, sem markdown e sem comentários, no formato {"root":"texto","branches":[{"name":"texto","children":["texto"]}]}. Não inclua propriedades adicionais.';
-  const pedido = (n, novos) => "Gere um mapa mental completo e bem ramificado sobre: " + tema + ". Foco: " + foco + ".\nCrie exatamente " + n + " " + (novos ? "ramificações NOVAS, diferentes das já existentes (" + novos + ")" : "ramificações") + ", cada uma com " + sub + " subtópicos curtos (até 12 palavras, sem frases longas).\nResponda em português do Brasil. Use rótulos objetivos e hierarquia clara; evite repetir ideias entre ramificações.";
-  const r = await pedir({ rotulo: "Mapa mental", json: true, max_tokens: tokensMapa(ramos, sub), system: sis, messages: [{ role: "user", content: pedido(ramos) + "\n" + App.instrucaoNivel() }] });
+async function pesquisarFontesMapa(tema, pedido, mapaAtual, sinal, aoStatus) {
+  aoStatus?.("Pesquisando fontes na web antes de criar o mapa…");
+  const pedidoLimpo = String(pedido || "").replace(/\s+/g, " ").trim();
+  const pedidoNovo = /\b(crie|criar|faça|faca|monte|gerar|novo mapa|outro mapa|mapa sobre)\b/i.test(pedidoLimpo);
+  const assunto = String((pedidoNovo ? tema : (mapaAtual && mapaAtual.root)) || tema || pedido || "").trim();
+  const consultas = [
+    (assunto + " conceitos principais explicação").trim(),
+    (assunto + " documentação oficial fundamentos").trim(),
+    (pedidoLimpo.length > 8 ? pedidoLimpo : assunto).slice(0, 180)
+  ].filter((q, i, a) => q && a.indexOf(q) === i);
+  const resultados = [];
+  for (const q of consultas) {
+    if (sinal?.aborted) throw Object.assign(new Error("Pesquisa cancelada."), { aborto: true });
+    try {
+      const lote = await pesquisarWeb(q, sinal);
+      for (const item of lote) {
+        if (!item || !item.url || !/^https?:\/\//i.test(item.url) || !item.texto) continue;
+        const chave = item.url.split("#")[0].replace(/\/$/, "").toLowerCase();
+        if (!resultados.some((x) => x.url.split("#")[0].replace(/\/$/, "").toLowerCase() === chave)) resultados.push(item);
+      }
+    } catch (e) { if (sinal?.aborted) throw e; }
+    if (resultados.length >= 10) break;
+  }
+  if (!resultados.length) throw new Error("Não encontrei fontes acessíveis na web para este assunto. Para evitar informações sem verificação, não criei o mapa. Tente outro termo ou tente novamente mais tarde.");
+  return resultados.slice(0, 10);
+}
+function contextoFontesMapa(fontes) {
+  return "PESQUISA NA WEB OBRIGATÓRIA — FONTES CONSULTADAS (use estas fontes como base factual; não invente dados, versões, números, datas ou recursos que elas não sustentem):\n" +
+    fontes.map((f, i) => "[" + (i + 1) + "] " + f.titulo + " — " + f.url + "\n" + String(f.texto).slice(0, 1400)).join("\n\n") +
+    "\n\nREGRAS DE CONFIABILIDADE: priorize documentação oficial e fontes primárias quando disponíveis; se as fontes forem insuficientes ou divergentes, sinalize a incerteza no subtópico em vez de adivinhar; não apresente inferências como fatos; não invente fontes ou links. Inclua marcadores [1], [2] nos subtópicos que dependam dessas fontes.";
+}
+async function mapaMental({ tema, foco, ramos = 8, sub = 5, pedido = "", mapaAtual = null, aoStatus, signal }) {
+  const fontes = await pesquisarFontesMapa(tema, pedido, mapaAtual, signal, aoStatus);
+  const contextoWeb = contextoFontesMapa(fontes);
+  const sis = 'Retorne exclusivamente um objeto JSON válido, sem markdown e sem comentários, no formato {"root":"texto","branches":[{"name":"texto","children":["texto"]}]}. Não inclua propriedades adicionais. Cada children deve conter frases explicativas completas, não palavras soltas. Use exclusivamente fatos sustentados pelas fontes de pesquisa fornecidas; não invente informações.';
+  const contextoAtual = mapaAtual ? "\nMAPA ATUAL PARA REVISÃO (preserve os pontos corretos e aplique o pedido do usuário):\n" + JSON.stringify(mapaAtual) : "";
+  const instrucao = pedido || ("Crie um mapa mental sobre " + tema + ".");
+  const pedidoCompleto = "O usuário está conversando com um assistente especializado em criar mapas mentais visuais. Interprete o pedido em linguagem natural abaixo; não exija uma frase de comando específica.\n\nPEDIDO DO USUÁRIO:\n" + instrucao + contextoAtual + "\n\nCrie ou atualize um MAPA MENTAL EDITORIAL, detalhado e didático. Use como tema central um título curto e claro. Gere exatamente " + ramos + " ramificações principais, distribuídas de modo equilibrado, e até " + sub + " subtópicos por ramo. Se o usuário pedir quantidade diferente, respeite-a dentro desses limites. Cada subtópico deve ser uma explicação específica de 12 a 24 palavras, com conceito, finalidade, relação, aplicação ou exemplo concreto. Não use rótulos genéricos, palavras soltas ou lorem ipsum. Organize os ramos em sequência pedagógica, sem repetição. Se for uma solicitação de alteração do mapa existente, mantenha o conteúdo relevante e faça a mudança solicitada sem descartar informações úteis. Se o usuário pedir um novo tema, crie um mapa novo. Responda em português do Brasil.\n" + App.instrucaoNivel() + "\n\n" + contextoWeb;
+  const r = await pedir({ rotulo: "Mapa mental", json: true, max_tokens: tokensMapa(ramos, sub), system: sis, messages: [{ role: "user", content: pedidoCompleto }], signal });
   let { mapa, parcial } = lerMapa(r, tema); let nota = "";
   for (let rodada = 0; parcial && mapa.branches.length < ramos && rodada < 2; rodada++) {
     const falta = ramos - mapa.branches.length; aoStatus?.("Completando " + falta + " ramificação(ões) que faltaram…");
     try {
-      const r2 = await pedir({ rotulo: "Mapa mental (complemento)", json: true, max_tokens: tokensMapa(falta, sub), system: sis.replace('{"root":"texto","branches"', '{"branches"'), messages: [{ role: "user", content: pedido(falta, mapa.branches.map((b) => b.name).join("; ")) }] });
+      const r2 = await pedir({ rotulo: "Mapa mental (complemento)", json: true, max_tokens: tokensMapa(falta, sub), system: sis, messages: [{ role: "user", content: "Complete o mapa sobre " + tema + " com exatamente " + falta + " ramificações adicionais e " + sub + " explicações específicas por ramo. Não repita estes ramos: " + mapa.branches.map((b) => b.name).join("; ") + ". Retorne o mesmo formato JSON.\n\n" + contextoWeb }], signal });
       const extra = lerMapa(r2, tema); const vistos = new Set(mapa.branches.map((b) => b.name.toLowerCase()));
       extra.mapa.branches.forEach((b) => { if (!vistos.has(b.name.toLowerCase()) && mapa.branches.length < ramos) { mapa.branches.push(b); vistos.add(b.name.toLowerCase()); } });
       parcial = extra.parcial;
@@ -450,7 +490,21 @@ async function mapaMental({ tema, foco, ramos, sub, aoStatus }) {
   }
   mapa.branches = mapa.branches.slice(0, ramos).map((b) => ({ name: b.name, children: b.children.slice(0, sub) }));
   if (!nota && mapa.branches.length < ramos) nota = "A IA devolveu " + mapa.branches.length + " de " + ramos + " ramificações pedidas.";
-  return { mapa, nota };
+  return { mapa, nota, fontes };
+}
+
+/* ---------- 10B. Técnica Feynman invertida ---------- */
+async function gerarCasoFeynman() {
+ const aulaAtual = App.aulaAtual?.();
+ const contextoAula = aulaAtual ? "\nCONTEXTO DA AULA ABERTA: " + aulaAtual.t + "\n" + String(aulaAtual.h || "").slice(0, 2200) : "";
+ const r=await pedir({rotulo:"Gerar chamado do estagiário",json:true,max_tokens:1300,temperature:0.75,system:App.instrucaoNivel()+ 'Você é um engenheiro de dados júnior em um ambiente Databricks. Crie um caso didático realista com bug sutil ou decisão ruim em Delta Lake, PySpark, Spark SQL, Auto Loader, Unity Catalog ou Workflows. Não revele a correção no ticket. Retorne SOMENTE JSON: {"area":"...","title":"...","level":"Intermediário|Avançado","ticket":"...","code":"...","hint":"...","answer":"gabarito comentado detalhado","keywords":["termos técnicos esperados"]}. Código plausível e curto. O gabarito deve explicar impacto em produção e correção. Português do Brasil.',messages:[{role:"user",content:"Gere um cenário inédito, não genérico, que teste raciocínio sobre performance, custo, confiabilidade ou modelagem. Evite exemplos óbvios já muito repetidos." + contextoAula}]});
+ const c=objetoJson(r); if(!c.title||!c.ticket||!c.answer)throw new Error("Caso gerado incompleto."); return {id:"ai-"+Date.now(),area:String(c.area||"Databricks"),title:String(c.title),level:String(c.level||"Intermediário"),ticket:String(c.ticket),code:String(c.code||""),hint:String(c.hint||"Explique o impacto em produção."),answer:String(c.answer),keywords:Array.isArray(c.keywords)?c.keywords.map(String):[]};
+}
+async function avaliarFeynman({caso,resposta}) {
+ const aulaAtual = App.aulaAtual?.();
+ const contextoAula = aulaAtual ? "\nAULA ABERTA NO SITE: " + aulaAtual.t + "\n" + String(aulaAtual.h || "").slice(0, 1600) : "";
+ const r=await pedir({rotulo:"Avaliação Feynman invertida",json:true,max_tokens:1500,temperature:0.2,system:App.instrucaoNivel()+' Você avalia um mentor que explica um problema a um estagiário. Seja justo: aceite soluções tecnicamente equivalentes. Retorne SOMENTE JSON: {"reaction":"reação curta em personagem do estagiário; se vago, faça uma contra-pergunta; se correto, reconheça","clarity":0,"technical":0,"solution":0,"score":0,"missing":"detalhe importante ausente ou o que aprofundar","reference":"correção técnica e código/arquitetura recomendado"}. Notas inteiras de 0 a 10. Clareza didática, precisão técnica e solução proposta são critérios separados. Não dê nota alta sem evidência na resposta. Português do Brasil.',messages:[{role:"user",content:"CHAMADO DO ESTAGIÁRIO:\nÁrea: "+caso.area+"\nProblema: "+caso.ticket+"\nCódigo:\n"+caso.code+"\nGABARITO DE REFERÊNCIA (use para avaliar, não copie cegamente):\n"+caso.answer+"\n\nRESPOSTA DO MENTOR:\n"+resposta+"\n\nAvalie se explicou o erro, impacto real em produção e alternativa correta. A referência deve conter código/arquitetura corrigida quando pertinente."+contextoAula}],validar:t=>{const d=objetoJson(t);if(!d.reaction||!d.reference||!Number.isFinite(Number(d.score)))throw new Error("Avaliação incompleta.");}});
+ const d=objetoJson(r); return {reaction:String(d.reaction),clarity:Math.max(0,Math.min(10,Number(d.clarity)||0)),technical:Math.max(0,Math.min(10,Number(d.technical)||0)),solution:Math.max(0,Math.min(10,Number(d.solution)||0)),score:Math.max(0,Math.min(10,Number(d.score)||0)),missing:String(d.missing||""),reference:String(d.reference||"")};
 }
 
 /* ---------- 11. Geração de questões, cards e revisão ---------- */
@@ -464,8 +518,17 @@ function validarMultipla(x, cfg) {
   if (!isObj(x) || !String(x.p || "").trim() || !Array.isArray(x.o) || x.o.length !== 4) return null;
   const o = x.o.map((s) => tiraRotulo(typeof s === "string" ? s : ""));
   if (o.some((s) => !s || /^(alternativa|op[cç][aã]o)?\s*[a-d1-4]$/i.test(s)) || new Set(o.map(normCmp)).size < 4) return null;
-  const correta = tiraRotulo(x.correta || ""); if (!correta || !String(x.e || "").trim()) return null;
-  let a = o.findIndex((s) => s === correta); if (a < 0) a = o.findIndex((s) => normCmp(s) === normCmp(correta)); if (a < 0) return null;
+  let correta = tiraRotulo(x.correta || "");
+  let a = -1;
+  const indiceInformado = Number(x.a);
+  if (Number.isInteger(indiceInformado) && indiceInformado >= 0 && indiceInformado < 4) a = indiceInformado;
+  if (correta) {
+    const porTexto = o.findIndex((s) => s === correta);
+    const porNormalizado = porTexto < 0 ? o.findIndex((s) => normCmp(s) === normCmp(correta)) : porTexto;
+    if (porNormalizado >= 0) a = porNormalizado;
+  }
+  if (a < 0 || !String(x.e || x.explicacao || x.explanation || "").trim()) return null;
+  correta = o[a];
   const nc = normCmp(o[a]);
   if (nc.length >= 14 && normCmp(x.p).includes(nc)) return null;
   if (nc.length >= 6 && x.codigo && normCmp(x.codigo).includes(nc)) return null;
@@ -475,25 +538,43 @@ function validarMultipla(x, cfg) {
   return { p: esc(String(x.p).trim()) + (x.codigo && String(x.codigo).trim() ? "<pre><code>" + esc(String(x.codigo)) + "</code></pre>" : ""), o: emb, a: emb.indexOf(certa), e: String(x.e).trim(), lv: ["IA", nivel, tipo].filter(Boolean).join(" · "), _raw: String(x.p).trim() };
 }
 function validarPratica(x) {
-  if (!isObj(x) || !String(x.p || "").trim() || !["SQL", "Python", "PySpark"].includes(x.linguagem) || !String(x.solucao || "").trim()) return null;
-  return { mode: "code", language: x.linguagem, p: esc(String(x.p).trim()), task: String(x.instrucoes || ""), starter: String(x.codigoInicial || ""), solution: String(x.solucao), e: String(x.e || ""), lv: "Prática de código · " + x.linguagem, _raw: String(x.p).trim() };
+  if (!isObj(x)) return null;
+  const enunciado = x.p || x.enunciado || x.prompt || x.question || x.objetivo;
+  const linguagem = String(x.linguagem || x.language || "Python").trim();
+  const solucao = x.solucao || x.solution || x.resposta || x.codigoSolucao;
+  if (!String(enunciado || "").trim() || !["SQL", "Python", "PySpark"].includes(linguagem) || !String(solucao || "").trim()) return null;
+  return { mode: "code", language: linguagem, p: esc(String(enunciado).trim()), task: String(x.instrucoes || x.instructions || x.tarefa || ""), starter: String(x.codigoInicial || x.starter || x.codigo_inicial || ""), solution: String(solucao), e: String(x.e || x.explicacao || x.explanation || ""), lv: "Prática de código · " + linguagem, _raw: String(enunciado).trim() };
 }
 function promptQuestoes(cfg, n, modo, anteriores) {
   const pegadinha = cfg.pegadinhas ? "Inclua pegadinhas justas: detalhes pequenos e relevantes que mudam a resposta; não use ambiguidade nem informação escondida." : "Não inclua pegadinhas; formule questões diretas e sem detalhes traiçoeiros.";
   const evitar = anteriores.length ? "\nNão repita nem parafraseie estes enunciados já usados: " + anteriores.slice(-12).map((p) => "«" + p.slice(0, 100) + "»").join("; ") : "";
   const extra = cfg.extra ? "\nInstruções e material de referência do aluno:\n" + cfg.extra.slice(0, 6500) : "";
-  const base = "Tema: " + cfg.tema + ". Dificuldade: " + cfg.dif + ". Linguagem do código: " + cfg.ling + "." + extra + evitar + "\n" + pegadinha;
+  const base = "Tema: " + cfg.tema + ". Dificuldade: " + cfg.dif + ". Linguagem do código: " + cfg.ling + "." + (cfg.ling === "Python" ? " O contexto principal é Python e ciência de dados; não force exemplos de Databricks se não forem pertinentes." : "") + extra + evitar + "\n" + pegadinha;
   if (modo === "ide") return base + "\nCrie " + n + " exercício(s) de prática de código em que o aluno escreve ou completa o código. A solução de referência deve ser completa e NÃO pode aparecer no objetivo, nas instruções nem no código inicial.\n" +
     'Responda somente com o JSON: [{"tipo":"Prática de código","linguagem":"SQL|Python|PySpark","p":"objetivo curto","instrucoes":"requisitos detalhados","codigoInicial":"esqueleto incompleto opcional","solucao":"solução de referência completa","e":"conceito praticado"}]';
   const tipo = cfg.tipo === "Misto" ? "Conceitual, Código ou Cenário" : cfg.tipo === "Código (SQL/PySpark)" ? "Código" : cfg.tipo === "Cenário prático" ? "Cenário" : "Conceitual";
   return base + "\nCrie " + n + " questão(ões) de múltipla escolha do tipo " + tipo + ", em português do Brasil, sempre no contexto Databricks. Exatamente 4 alternativas e exatamente 1 correta. Enunciados e alternativas curtos. Cenário: situação real de trabalho e a melhor decisão técnica. Conceitual: compreensão e aplicação, não decoreba. Código: trecho neutro ou esqueleto incompleto que não entregue a resposta; sem código use \"codigo\":\"\". Alternativas com texto completo e significativo — nunca apenas \"A\", \"B\", \"Alternativa A\" ou \"Opção B\". Distratores plausíveis. Varie a posição da correta.\n" +
     'Responda somente com o JSON: {"questions":[{"nivel":"Fácil|Médio|Difícil","tipo":"Conceitual|Código|Cenário","p":"enunciado","codigo":"","o":["texto completo da alternativa 1","texto completo da alternativa 2","texto completo da alternativa 3","texto completo da alternativa 4"],"a":0,"correta":"copie exatamente o texto da alternativa correta","e":"explique por que a correta é certa e as demais não"}]}. "a" é inteiro de 0 a 3.';
 }
+function extrairItensGeracao(texto) {
+  const limpo = limparFences(String(texto || ""));
+  try {
+    const obj = objetoJson(limpo);
+    if (Array.isArray(obj)) return obj;
+    for (const k of ["questions", "questoes", "items", "itens", "exercises", "exercicios", "data", "results"]) {
+      if (Array.isArray(obj[k])) return obj[k];
+    }
+  } catch (_) {}
+  const arr = itensArray(limpo);
+  return Array.isArray(arr.itens) ? arr.itens : [];
+}
 async function lote(cfg, n, modo, anteriores, sinal) {
-  const r = await pedir({ rotulo: "Gerar questões", json: true, temperature: 0.5, signal: sinal, max_tokens: (modo === "ide" ? 750 : 520) * n + 300,
-    system: "Você é o Datrics, gerador de questões desta apostila de Databricks. " + ESCOPO + " Responda somente JSON válido, sem markdown.",
+  const r = await pedir({ rotulo: "Gerar questões", json: true, temperature: 0.35, signal: sinal, max_tokens: (modo === "ide" ? 900 : 700) * n + 450,
+    system: (cfg.ling === "Python" ? "Você é o Datrics, professor especialista em Python e ciência de dados." : "Você é o Datrics, gerador de questões desta apostila de Databricks. " + ESCOPO) + " Gere exatamente o formato solicitado. Responda somente JSON válido, sem markdown ou texto externo.",
     messages: [{ role: "user", content: promptQuestoes(cfg, n, modo, anteriores) }] });
-  return itensArray(r).itens.map((x) => modo === "ide" ? validarPratica(x) : validarMultipla(x, cfg)).filter(Boolean).slice(0, n);
+  const itens = extrairItensGeracao(r);
+  const validadas = itens.map((x) => modo === "ide" ? validarPratica(x) : validarMultipla(x, cfg)).filter(Boolean).slice(0, n);
+  return validadas;
 }
 async function gerarCards(cfg, aula, sinal) {
   const r = await pedir({ rotulo: "Cards de estudo", json: true, temperature: 0.35, max_tokens: 1100, signal: sinal,
@@ -503,11 +584,17 @@ async function gerarCards(cfg, aula, sinal) {
   return itensArray(r.slice(r.indexOf('"cards"'))).itens.slice(0, 4).map((c) => ({ title: String(c.title || "").slice(0, 100), concept: String(c.concept || "").slice(0, 300), explanation: String(c.explanation || "").slice(0, 900), example: String(c.example || "").slice(0, 1200) })).filter((c) => c.concept || c.explanation);
 }
 async function gerarTextoAula(cfg, parte, sinal) {
-  const r = await pedir({ rotulo: "Conteúdo da aula", json: true, temperature: 0.35, max_tokens: 950, signal: sinal,
-    system: "Você é um professor técnico de Databricks. Escreva conteúdo didático em português do Brasil, correto, claro e progressivo. Responda somente JSON válido.",
-    messages: [{ role: "user", content: "Escreva o texto principal de uma aula completa (aprox. 350 a 550 palavras), com subtítulos Markdown simples, explicação, exemplo prático e boas práticas. Não crie questões (elas serão geradas separadamente).\nTema: " + cfg.tema + "\nAula: " + parte.titulo + "\nFoco: " + (parte.contexto || parte.titulo) + "\nDificuldade: " + cfg.dif + "\nFormato: {\"body\":\"texto completo\"}" }],
-    validar: (t) => { const d = objetoJson(t); if (typeof d.body !== "string" || d.body.trim().length < 120) throw new Error("Texto didático muito curto."); } });
-  return String(objetoJson(r).body).slice(0, 9000);
+  /* Texto de aula é solicitado em Markdown puro, não em JSON. Isso evita
+     que aspas, quebras de linha e caracteres de controle do conteúdo didático
+     invalidem o JSON de provedores com compatibilidade imperfeita. O orquestrador
+     também consegue continuar respostas interrompidas pelo limite de tokens. */
+  const r = await pedir({ rotulo: "Conteúdo da aula", json: false, temperature: 0.3, max_tokens: 1600, timeout: 60000, signal: sinal,
+    system: "Você é um professor especialista em " + (cfg.ling === "Python" ? "Python e ciência de dados" : "Databricks e engenharia de dados") + ". Escreva em português do Brasil, com precisão técnica, clareza e progressão didática. Entregue diretamente o conteúdo da aula em Markdown. Não use JSON, não envolva a resposta em bloco de código e não crie questões.",
+    messages: [{ role: "user", content: "Produza o texto principal de uma aula completa, com aproximadamente 350 a 500 palavras. Organize com título e subtítulos Markdown; inclua explicação dos conceitos, exemplo prático comentado e boas práticas. Não crie questões (elas serão geradas separadamente).\n\nTema do módulo: " + cfg.tema + "\nAula: " + parte.titulo + "\nFoco: " + (parte.contexto || parte.titulo) + (cfg.extra ? "\n\nMaterial de referência enviado pelo usuário (use como base e preserve os tópicos, sem ignorar ou substituir):\n" + cfg.extra.slice(0, 4500) : "") + "\n\nNível: " + cfg.dif + "\n\nEntregue somente o conteúdo didático final, sem prefácio sobre o que vai fazer." }],
+    validar: (t) => { const limpo = textoFinal(t).trim(); if (limpo.length < 450 || limpo.split(/\s+/).length < 70) throw new Error("Texto didático incompleto ou muito curto."); } });
+  const corpo = textoFinal(r).trim();
+  if (corpo.length < 450) throw new Error("Texto didático incompleto ou muito curto.");
+  return corpo.slice(0, 14000);
 }
 async function revisar(questoes, sinal) {
   const gerador = ultimoOk; const outro = conectados().find((id) => id !== gerador && !pausado(id)) || gerador;
@@ -541,8 +628,21 @@ async function encherQuestoes(t, parte, progresso, sinal) {
     const n = t.cfg.tipo === "Misto" ? 1 : Math.min(falta, modo === "ide" ? 2 : 5);
     progresso("Gerando questões " + (parte.all.length + 1) + "–" + (parte.all.length + n) + " de " + parte.qtd + (parte.titulo ? " · " + parte.titulo : "") + "…");
     const cfgParte = Object.assign({}, t.cfg, parte.contexto ? { tema: t.cfg.tema + " — " + parte.contexto } : {});
-    const novas = await lote(cfgParte, n, modo, t.anteriores, sinal);
-    if (!novas.length) { if (++vazios >= 2) throw new Error("A IA devolveu duas respostas sem questões válidas seguidas."); continue; }
+    let novas = await lote(cfgParte, n, modo, t.anteriores, sinal);
+    if (!novas.length && modo === "ide") {
+      progresso("Ajustando o formato da atividade e tentando novamente…");
+      novas = await lote(cfgParte, n, "mc", t.anteriores, sinal);
+    }
+    if (!novas.length) {
+      vazios++;
+      if (vazios >= 2) {
+        parte.qtd = parte.all.length;
+        parte.falhaQuestoes = "Não foi possível validar as questões geradas nesta etapa; o conteúdo da aula será salvo mesmo assim.";
+        aviso(parte.falhaQuestoes, true);
+        break;
+      }
+      continue;
+    }
     vazios = 0; parte.all.push(...novas); t.anteriores.push(...novas.map((q) => q._raw)); t.batchesCompleted = (t.batchesCompleted || 0) + 1;
     gravarTrabalho(t);
   }
@@ -719,7 +819,7 @@ const RX = {
   conteudo: /\b(m[oó]dulos?|unidades?|trilhas?|cap[ií]tulos?|aulas?|material de estudo|cards? explicativos?|conte[uú]do did[aá]tico)\b/i,
   modulo: /\b(m[oó]dulos?|unidades?|trilhas?|cap[ií]tulos?)\b/i,
   criarAula: /\b(crie|criar|gere|gerar|monte|montar|elabore|elaborar|prepare|preparar|produza|produzir|fa[cç]a|adicione|adicionar)\s+(?:(?:para mim)\s+)?(?:(?:uma?|as?|os?)\s+)?(?:nova\s+|novas\s+|novos?\s+)?(?:\d+\s+)?(?:aulas?|material|cards?|conte[uú]do)\b/i,
-  criarModulo: /\b(crie|criar|gere|gerar|monte|montar|elabore|elaborar|prepare|preparar|adicione|adicionar|fa[cç]a)\s+(?:(?:para mim)\s+)?(?:(?:um|uma|os|as)\s+)?(?:novo\s+|nova\s+|novos\s+|novas\s+)?(?:m[oó]dulos?|unidades?|trilhas?|cap[ií]tulos?)\b/i,
+  criarModulo: /\b(crie|criar|gere|gerar|monte|montar|elabore|elaborar|prepare|preparar|adicione|adicionar|fa[cç]a)\s+(?:(?:para mim)\s+)?(?:(?:um|uma|os|as)\s+)?(?:novo\s+|nova\s+|novos\s+|novas\s+)?(?:\d{1,2}\s+)?(?:m[oó]dulos?|unidades?|trilhas?|cap[ií]tulos?)\b/i,
   editar: /\b(mude|mudar|altere|alterar|troque|trocar|edite|editar|corrija|corrigir|renomeie|renomear|ajuste|ajustar|deixe|coloque|reescreva|reescrever|aumente|diminua)\b/i,
   alvoEdicao: /\b(quest|aula|m[oó]dulo|tema|cor|cores|site|interface|fonte|layout|efeito|fundo|apar[eê]ncia|visual|t[ií]tulo|nome|paleta|escuro|claro|cursor)/i
 };
@@ -730,7 +830,7 @@ function extrairTema(t) {
 }
 function quantidade(t, padrao) { const m = t.match(/(\d{1,2})\s*(?:\w+\s+)?(?:quest|exerc|desaf)/i) || t.match(/(?:quest\S*|exerc\S*|desaf\S*)\D{0,12}(\d{1,2})/i); return Math.min(25, Math.max(1, m ? Number(m[1]) : padrao)); }
 const dificuldade = (t) => /f[aá]c/i.test(t) ? "Fácil" : /dif[ií]c/i.test(t) ? "Difícil" : "Médio";
-const linguagem = (t) => /\bsql\b/i.test(t) ? "SQL" : /pyspark/i.test(t) ? "PySpark" : "Misto";
+const linguagem = (t) => /pyspark/i.test(t) ? "PySpark" : /python|pandas|numpy|matplotlib|jupyter/i.test(t) ? "Python" : /\bsql\b/i.test(t) ? "SQL" : "Misto";
 function aulaMencionada(t) {
   const n = normTexto(t);
   return App.aulas().find((l) => n.includes(normTexto(l.t)) || n.includes(l.id.replace(/[-_]/g, " ")) || normTexto(l.t).split(/\s+/).filter((w) => w.length >= 5).some((w) => n.includes(w))) || App.aulaAtual();
@@ -767,14 +867,38 @@ async function criarQuestoesChat(texto) {
   const alvo = await executarTrabalho(t, statusChat, controleAtivo.signal);
   return "Pronto: " + t.partes[0].all.length + " questão(ões) sobre **" + cfg.tema + "** em [" + alvo.t + "](#" + encodeURIComponent(alvo.id) + "). Elas aparecem no fim da aula.";
 }
+function tituloModuloDoPedido(texto) {
+  const limpo = String(texto || "").replace(/\*\*/g, "");
+  const m = limpo.match(/(?:^|\n)\s*M[oó]dulo\s+\d+\s*[:：–-]\s*([^\n]+)/i);
+  return m ? m[1].trim().replace(/[.。]+$/, "").slice(0, 120) : "";
+}
+function partesDoModulo(texto, tema) {
+  const linhas = String(texto || "").replace(/\r/g, "").split("\n");
+  const marcadores = [];
+  linhas.forEach((linha, i) => {
+    const m = linha.match(/^\s*\d{1,2}\.\s+\*\*(.{3,100}?)\*\*\s*$/) || linha.match(/^\s*\d{1,2}\.\s+(.{3,100})\s*$/);
+    if (m) marcadores.push({ i, titulo: m[1].replace(/\*\*/g, "").trim() });
+  });
+  if (!marcadores.length) return [
+    ["Fundamentos e conceitos essenciais", "fundamentos, definições e arquitetura"],
+    ["Sintaxe e estruturas principais", "sintaxe, elementos da linguagem e estruturas fundamentais"],
+    ["Aplicação prática e boas práticas", "exemplos práticos, bibliotecas, boas práticas e cenários reais"]
+  ];
+  return marcadores.slice(0, 12).map((m, i) => {
+    const fim = i + 1 < marcadores.length ? marcadores[i + 1].i : linhas.length;
+    const contexto = linhas.slice(m.i + 1, fim).join("\n").trim().slice(0, 2200);
+    return [m.titulo, contexto || ("Conteúdo e aplicação prática de " + m.titulo + " em " + tema)];
+  });
+}
 async function criarConteudo(texto) {
-  const tema = extrairTema(texto);
-  if (tema.length < 3) return "Claro. Qual tema você quer estudar? Diga o assunto (por exemplo: Delta Lake, Unity Catalog, PySpark ou SQL) e eu preparo aulas com cards.";
   const ehModulo = RX.criarModulo.test(texto);
+  const tituloInformado = ehModulo ? tituloModuloDoPedido(texto) : "";
+  const tema = tituloInformado || extrairTema(texto);
+  if (tema.length < 3) return "Claro. Qual tema você quer estudar? Diga o assunto (por exemplo: Delta Lake, Unity Catalog, PySpark ou SQL) e eu preparo aulas com cards.";
   const total = RX.questoes.test(texto) || ehModulo || RX.criarAula.test(texto) ? quantidade(texto, 5) : 0;
-  const base = ehModulo ? [["Fundamentos e conceitos essenciais", "fundamentos, definições e arquitetura"], ["Implementação e prática", "implementação prática, exemplos e uso no dia a dia"], ["Boas práticas e cenários reais", "boas práticas, otimização, governança e cenários reais"]] : [[tema, "introdução e conceitos centrais"]];
+  const base = ehModulo ? partesDoModulo(texto, tema) : [[tema, "introdução e conceitos centrais"]];
   const partes = base.map(([titulo, contexto], i) => ({ titulo, contexto, qtd: Math.floor(total / base.length) + (i < total % base.length ? 1 : 0), all: [], intro: "Aula sobre " + tema + " com foco em " + contexto + ". Leia os cards antes de praticar." }));
-  const cfg = { tema, dif: dificuldade(texto), tipo: "Misto", ling: linguagem(texto), extra: "", pegadinhas: false, cards: true };
+  const cfg = { tema, dif: dificuldade(texto), tipo: "Múltipla escolha", ling: linguagem(texto), extra: String(texto || "").slice(0, 6500), pegadinhas: false, cards: true };
   const t = novoTrabalho("tutor-study-lesson", cfg, partes, { modulo: ehModulo });
   const alvo = await executarTrabalho(t, statusChat, controleAtivo.signal);
   return (ehModulo ? "Módulo **" + tema + "** criado com " + partes.length + " aulas" : "Aula **" + tema + "** criada") + (total ? " e " + total + " questões" : "") + ". Comece por [" + alvo.t + "](#" + encodeURIComponent(alvo.id) + ").";
@@ -1051,7 +1175,7 @@ function iniciar() {
   setInterval(desenharSelo, 60000);
 }
 App.ia = {
-  iniciar, abrirChat, abrirGerador, apoio, diagnostico, avaliarCodigo, mapaMental, tokensMapa, telaGuia,
+  iniciar, abrirChat, abrirGerador, apoio, diagnostico, avaliarCodigo, gerarCasoFeynman, avaliarFeynman, mapaMental, tokensMapa, telaGuia,
   ligarGuia() {},
   aoMudarRota() { atualizarContextoChat(true); },
   aoMudarAjustes(s) { if (janela) janela.className = "datrics balao-" + s.ai.bubbleStyle; },

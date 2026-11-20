@@ -35,3 +35,26 @@ It pairs concise lessons (Lakehouse, Delta Lake, PySpark, Spark SQL, Auto Loader
 
 ### Getting Started
 Since this is a pure static web app, simply open `index.html` in any modern browser or serve the folder via any static host (such as GitHub Pages or VS Code Live Server)[cite: 2].
+
+## Correção do Datrics — geração de módulos
+
+- Geração de questões de módulos usa múltipla escolha como formato padrão, evitando alternância automática para exercícios de código que podia falhar na validação.
+- Reconhecimento de Python/Pandas/NumPy/Matplotlib/Jupyter como domínio Python.
+- Prompts e texto de aula adaptados ao assunto, sem forçar contexto Databricks em módulos de Python.
+- Parser de questões aceita respostas em arrays e objetos com chaves comuns (`questions`, `questoes`, `items`, `exercises` etc.).
+- Validação aceita índice numérico da alternativa correta e campos equivalentes em respostas de exercícios de código.
+- Se a API não produzir questões válidas após novas tentativas, a aula e o módulo ainda são salvos, com aviso, em vez de abortar toda a criação.
+
+
+## Atualização da trilha (20/11/2026)
+
+- A trilha padrão foi recriada em 4 módulos e 12 aulas.
+- Cada aula inclui conteúdo aprofundado, 3 questões e 2 cards de estudo (36 questões e 24 cards no total).
+- O conteúdo segue o formato estruturado usado pelo Datrics e a renderização padrão da apostila.
+- Na primeira abertura desta versão, a trilha antiga e seu progresso/estatísticas/marcações são substituídos uma única vez. Temas, configurações, chaves de API e backups salvos são preservados.
+- O botão de fechar do Datrics agora tem área de toque ampliada e permanece alinhado ao cabeçalho em telas estreitas.
+
+
+## Pesquisa obrigatória nos mapas mentais
+
+O criador de mapas mentais consulta a web antes de cada criação ou alteração. Os resultados são incorporados ao contexto de geração sem remover as instruções editoriais e pedagógicas já existentes. A IA deve basear afirmações factuais nas fontes consultadas, sinalizar lacunas e não inventar referências. Os links e trechos de fontes ficam salvos junto ao mapa e são exibidos em "Fontes consultadas na web". Se nenhuma fonte puder ser recuperada, o sistema interrompe a criação em vez de produzir um mapa factual sem verificação. A consulta é feita uma vez por pedido e o mesmo contexto é compartilhado com os provedores de IA usados no fallback.
