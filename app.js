@@ -228,18 +228,50 @@ function normalizarStats(s) {
 const salvarProgresso = () => armazem.gravar(K.progresso, S.progresso) || aviso("Não foi possível salvar o progresso.", true);
 const salvarStats = () => armazem.gravar(K.stats, S.stats) || aviso("Não foi possível salvar as estatísticas.", true);
 
+function atualizarPainelInicio() {
+  const main = document.getElementById("principal");
+  if (!main || S.ajustes.navigationMode !== "scroll" || main.dataset.continuo !== "1") return;
+  /* No modo contínuo a home é montada apenas uma vez. Atualize todos os
+     blocos derivados do progresso, não somente o placar. */
+  const doc = new DOMParser().parseFromString(telaInicio(), "text/html");
+  const atualPlacar = main.querySelector(".placar");
+  const novoPlacar = doc.querySelector(".placar");
+  if (atualPlacar && novoPlacar) atualPlacar.replaceWith(novoPlacar);
+  const atualResumo = main.querySelector("[data-progress-live]");
+  const novoResumo = doc.querySelector("[data-progress-live]");
+  if (atualResumo && novoResumo) atualResumo.replaceWith(novoResumo);
+  desenharIndice();
+  if (novoPlacar) prepararAnimacoes(novoPlacar);
+  if (novoResumo) prepararAnimacoes(novoResumo);
+}
+
 function registrarResposta(aulaId, qi, certo) {
   const a = (S.stats[aulaId] = S.stats[aulaId] || {});
   const r = (a[qi] = a[qi] || { correct: 0, wrong: 0 });
   if (certo) r.correct++; else r.wrong++;
-  salvarStats();
+  salvarStats(); atualizarPainelInicio();
   return r;
 }
 function concluirQuestao(aulaId, qi) {
   const lista = (S.progresso[aulaId] = S.progresso[aulaId] || []);
   if (!lista.includes(qi)) { lista.push(qi); salvarProgresso(); }
+  atualizarPainelInicio();
+  const main = document.getElementById("principal");
+  if (main?.dataset.continuo === "1") {
+    const secao = document.getElementById("sec-" + aulaId);
+    const aula = acharAula(aulaId);
+    if (secao && aula) {
+      const feitas = (S.progresso[aulaId] || []).length;
+      const meta = secao.querySelector(".aula-meta");
+      const resolvida = meta && [...meta.querySelectorAll("span")].find((el) => /resolvida/.test(el.textContent));
+      if (resolvida) resolvida.textContent = feitas + " resolvida" + (feitas === 1 ? "" : "s");
+      const contador = secao.querySelector(".questoes-cab .mini");
+      if (contador) contador.textContent = feitas + "/" + aula.q.length;
+    }
+  }
 }
-function limparDadosDaAula(aulaId) { delete S.progresso[aulaId]; delete S.stats[aulaId]; salvarProgresso(); salvarStats(); }
+
+function limparDadosDaAula(aulaId) { delete S.progresso[aulaId]; delete S.stats[aulaId]; salvarProgresso(); salvarStats(); atualizarPainelInicio(); }
 const aulaConcluida = (l) => l.q.length > 0 && (S.progresso[l.id] || []).length >= l.q.length && l.q.every((_, i) => (S.progresso[l.id] || []).includes(i));
 
 /* Números do painel: conclusão por questões certas; acerto por tentativas. */
@@ -708,9 +740,10 @@ function alternarTema() {
 function desenharAlternarModo() {
   const b = $("#alternarModo"); if (!b) return;
   const continuo = S.ajustes.navigationMode === "scroll";
-  b.hidden = S.rota !== "home";
+  b.hidden = false;
   b.setAttribute("aria-pressed", String(continuo));
-  b.textContent = continuo ? "Ler em páginas separadas" : "Ler tudo numa página só";
+  b.setAttribute("aria-label", continuo ? "Mudar para páginas separadas" : "Mudar para página única");
+  b.textContent = continuo ? "▤  Várias páginas" : "▣  Página única";
 }
 function alternarModo() {
   S.ajustes.navigationMode = S.ajustes.navigationMode === "scroll" ? "pages" : "scroll";
@@ -750,12 +783,14 @@ function render() {
     else if (tipo === "bookmarks") html = telaMarcados();
     else if (tipo === "data-lab") html = laboratorio.tela();
     else if (tipo === "ia-study") html = App.ia?.telaGuia?.() || '<p>A camada de IA não carregou. Verifique se o arquivo ia.js está junto deste.</p>';
-    main.innerHTML = '<div class="rota">' + html + "</div>";
+    main.innerHTML = '<div class="rota rota-entrando">' + html + "</div>";
     ligarTela(main);
+    const rotaNova = main.querySelector(".rota");
+    rotaNova?.addEventListener("animationend", () => rotaNova.classList.remove("rota-entrando"), { once: true });
     if (S.rotaAnterior && S.rotaAnterior !== S.rota) scrollTo({ top: 0, behavior: "auto" });
   }
   $("#estrutura").classList.toggle("sem-indice", !COM_INDICE.has(tipo));
-  desenharIndice(); marcarNavAtual(); desenharAlternarModo();
+  desenharIndice(); marcarNavAtual(); desenharAlternarModo(); observarSecoesContinuas();
   const aula = ehAula ? acharAula(pedida) : null;
   document.title = (aula ? aula.t + " · " : tipo === "admin" ? "Editor · " : ROTAS_FIXAS[tipo] && tipo !== "home" ? ROTAS_FIXAS[tipo] + " · " : "") + (S.ajustes.brand || AJUSTES_PADRAO.brand);
   App.ia?.aoMudarRota?.(aula);
@@ -767,6 +802,84 @@ function ligarTela(raiz) {
   if ($("#labTabela", raiz)) laboratorio.ligar(raiz);
   if ($("#editorRaiz", raiz)) editor.ligar(raiz);
   App.ia?.ligarGuia?.(raiz);
+  prepararAnimacoes(raiz);
+}
+
+/* Animações leves e reversíveis durante a rolagem.
+   O observador permanece único para evitar callbacks duplicados ao navegar. */
+function prepararAnimacoes(raiz) {
+  if (!raiz) return;
+  if (reduzMovimento() || !("IntersectionObserver" in window)) {
+    $$("[data-reveal]", raiz).forEach((el) => el.classList.add("revelado"));
+    return;
+  }
+  const seletores = [
+    ".rota h1", ".rota h2", ".rota .lead", ".rota .olho",
+    ".rota .cartao", ".rota .card", ".rota .painel",
+    ".rota .modulo-card", ".rota .questao", ".rota .stat",
+    ".rota .callout", ".rota .secao-cab"
+  ].join(",");
+  const vistos = new Set();
+  $$(seletores, raiz).forEach((el, i) => {
+    if (el.closest(".menu-pop-portal, dialog") || el.hasAttribute("data-sem-animacao") || vistos.has(el)) return;
+    vistos.add(el);
+    el.dataset.reveal = "true";
+    el.dataset.revealTipo = (i % 3 === 0) ? "subir" : (i % 3 === 1 ? "suave" : "zoom");
+    el.style.setProperty("--reveal-delay", Math.min((i % 4) * 45, 135) + "ms");
+    observerRevelacao?.observe(el);
+  });
+}
+
+let observerRevelacao = null;
+let sentidoRolagem = "descendo";
+let ultimaPosicaoRolagem = window.scrollY || 0;
+let quadroDirecao = false;
+addEventListener("scroll", () => {
+  if (quadroDirecao) return;
+  quadroDirecao = true;
+  requestAnimationFrame(() => {
+    const y = window.scrollY || 0;
+    if (Math.abs(y - ultimaPosicaoRolagem) > 2) sentidoRolagem = y < ultimaPosicaoRolagem ? "subindo" : "descendo";
+    ultimaPosicaoRolagem = y;
+    quadroDirecao = false;
+  });
+}, { passive: true });
+
+if ("IntersectionObserver" in window) {
+  observerRevelacao = new IntersectionObserver((entradas) => {
+    entradas.forEach((entrada) => {
+      const el = entrada.target;
+      el.dataset.revealSentido = sentidoRolagem;
+      el.classList.toggle("revelado", entrada.isIntersecting);
+    });
+  }, { threshold: 0.04, rootMargin: "-2% 0px -2% 0px" });
+}
+
+/* No modo de página única, o sumário acompanha a seção realmente visível,
+   mesmo quando o usuário rola manualmente em vez de clicar no índice. */
+let observadorSecoes = null;
+function observarSecoesContinuas() {
+  if (observadorSecoes) observadorSecoes.disconnect();
+  if (S.ajustes.navigationMode !== "scroll" || !("IntersectionObserver" in window)) return;
+  const secoes = $$(".secao-continua, #sec-ia-study, #principal > .rota > .coluna-larga");
+  if (!secoes.length) return;
+  observadorSecoes = new IntersectionObserver((entradas) => {
+    const candidatas = entradas.filter((e) => e.isIntersecting).sort((a,b) => b.intersectionRatio - a.intersectionRatio);
+    if (!candidatas.length) return;
+    const id = candidatas[0].target.id;
+    const rota = id === "sec-ia-study" ? "ia-study" : id.startsWith("sec-") ? id.slice(4) : "home";
+    S.rota = rota;
+    const indice = $("#indice");
+    if (!indice) return;
+    $$("a[href]", indice).forEach((link) => {
+      let destino = "";
+      try { destino = decodeURIComponent(new URL(link.href, location.href).hash.slice(1)); } catch {}
+      const ativo = destino === rota;
+      if (ativo) link.setAttribute("aria-current", "page");
+      else link.removeAttribute("aria-current");
+    });
+  }, { threshold: [0.12, 0.28, 0.5], rootMargin: "-18% 0px -58% 0px" });
+  secoes.forEach((secao) => observadorSecoes.observe(secao));
 }
 
 /* ---------- 12. Início ---------- */
@@ -783,6 +896,7 @@ function telaInicio() {
       '<div><dt>Acerto</dt><dd>' + st.acerto + "%<small>" + st.tentativas + " tentativa" + (st.tentativas === 1 ? "" : "s") + "</small></dd></div>" +
       '<div><dt>Acervo</dt><dd>' + st.total + "<small>questões · " + S.mods.length + " módulos · " + aulas().length + " aulas</small></dd></div>" +
     "</dl></aside></header>" +
+    '<div data-progress-live>' +
     (tudo ? '<section class="secao nota-lateral"><p><strong>Você resolveu todas as questões da apostila.</strong> Dá para continuar treinando com questões novas ou tirar dúvidas pontuais.</p><div class="linha-btns"><button class="btn btn-brasa" data-ia-acao="gerador">Criar questões com IA</button><button class="btn" data-ia-acao="chat">Perguntar ao Datrics</button></div></section>' : "") +
     '<section class="secao"><div class="secao-cab"><h2>Trilha</h2><span class="mini mono discreto">' + st.certas + " acertos · " + st.erradas + " erros</span></div>" +
     '<ol class="sumario">' + S.mods.map((m, mi) => {
@@ -799,7 +913,7 @@ function telaInicio() {
     (st.dificeis.length ? '<ul class="dificuldades">' + st.dificeis.map((d) => {
       const tent = d.certas + d.erradas; const ac = tent ? Math.round(d.certas * 100 / tent) : 0;
       return '<li><div><strong>' + esc(d.titulo) + '</strong><div class="mini discreto">' + ac + "% de acerto · " + d.feitas + "/" + d.total + ' questões resolvidas</div><div class="barra"><i style="width:' + ac + '%"></i></div></div><span class="num">' + d.erradas + " erro" + (d.erradas === 1 ? "" : "s") + "</span></li>";
-    }).join("") + "</ul>" : '<p class="discreto">Ainda não há erros registrados. Conforme você responder, os módulos que pedem revisão aparecem aqui.</p>') + "</section>" +
+    }).join("") + "</ul>" : '<p class="discreto">Ainda não há erros registrados. Conforme você responder, os módulos que pedem revisão aparecem aqui.</p>') + "</section></div>" +
     '<section class="secao nota-lateral"><p class="olho">Estudo com IA</p><p>O Datrics responde dúvidas sobre a aula aberta, cria questões novas e explica por que uma alternativa está errada. Ele usa a chave de API da sua própria conta — e pode errar, então confira o que for importante.</p><div class="linha-btns"><a class="btn" href="#ia-study">Ler o guia de configuração</a><button class="btn btn-texto" data-ia-acao="chat">Abrir o Datrics</button></div></section>' +
     "</div>";
 }

@@ -161,9 +161,12 @@ hr { border: 0; border-top: 1px solid var(--regua); margin: 2rem 0; }
 .indice .mod-titulo { display: flex; gap: 8px; font-weight: 600; color: var(--tinta); margin-bottom: 4px; }
 .indice .mod-titulo .num { color: var(--tinta-3); font-weight: 400; }
 .indice a { display: flex; text-decoration: none; }
-.indice ol a { display: flex; gap: 8px; align-items: baseline; padding: 5px 8px 5px 24px; border-radius: var(--raio); text-decoration: none; color: var(--tinta-2); position: relative; }
+.indice ol a { display: flex; gap: 8px; align-items: baseline; padding: 6px 8px 6px 24px; border-radius: var(--raio); text-decoration: none; color: var(--tinta-2); position: relative; transition: color 240ms ease, background-color 280ms ease, padding-left 280ms cubic-bezier(.2,.7,.2,1); }
 .indice a:hover { background: var(--folha-2); color: var(--tinta); }
-.indice a[aria-current="page"] { color: var(--tinta); background: var(--brasa-fundo); }
+.indice a[aria-current="page"] { color: var(--tinta); background: var(--brasa-fundo); padding-left: 27px; }
+.indice ol a::after { content: ""; position: absolute; left: 8px; top: 8px; bottom: 8px; width: 3px; border-radius: 4px; background: var(--brasa); transform: scaleY(0); transform-origin: center; opacity: 0; transition: transform 280ms cubic-bezier(.2,.7,.2,1), opacity 220ms ease; }
+.indice ol a[aria-current="page"]::after { transform: scaleY(1); opacity: 1; }
+.indice ol a[aria-current="page"]::before { transform: scale(.82); transition: transform 240ms ease; }
 .indice ol a::before { content: ""; position: absolute; left: 9px; top: 0.85em; width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid var(--regua-forte); }
 .indice ol a[data-estado="parcial"]::before { background: linear-gradient(90deg, var(--brasa) 50%, transparent 50%); border-color: var(--brasa); }
 .indice ol a[data-estado="feita"]::before { background: var(--certo); border-color: var(--certo); }
@@ -346,7 +349,8 @@ dialog::backdrop { background: oklch(0.2 0.02 60 / 0.4); backdrop-filter: blur(2
 .dlg-pe { padding: 14px 20px; border-top: 1px solid var(--regua); display: flex; justify-content: flex-end; gap: 8px; }
 dialog.largo { width: min(980px, calc(100vw - 24px)); }
 
-.avisos { position: fixed; right: 16px; bottom: 16px; z-index: 90; display: grid; gap: 8px; max-width: min(380px, calc(100vw - 32px)); }
+.avisos { position: fixed; right: 16px; top: calc(var(--topo-h) + 14px); z-index: 90; display: grid; gap: 8px; max-width: min(380px, calc(100vw - 32px)); pointer-events: none; }
+.aviso { pointer-events: auto; }
 .aviso { background: var(--tinta); color: var(--papel); padding: 10px 14px; border-radius: var(--raio); font-size: 0.88rem; box-shadow: var(--sombra-flutua); animation: sobe var(--t-media) var(--curva); }
 .aviso.err { background: var(--erro); color: var(--sobre-brasa); }
 .logs-lista { list-style: none; margin: 0; padding: 0; font-size: 0.85rem; }
@@ -442,7 +446,8 @@ dialog.largo { width: min(980px, calc(100vw - 24px)); }
 .fundo canvas { width: 100%; height: 100%; }
 
 .modo-continuo .pag-oculta { display: block !important; }
-.alternar-modo { position: fixed; left: 14px; bottom: 50px; z-index: 55; }
+.alternar-modo { position: fixed; left: 14px; bottom: 50px; z-index: 56; box-shadow: var(--sombra-flutua); backdrop-filter: blur(10px); }
+.alternar-modo[aria-pressed="true"] { border-color: var(--brasa); }
 
 /* ---------- 17. Navegação móvel ---------- */
 .nav-movel { display: none; }
@@ -469,6 +474,7 @@ dialog.largo { width: min(980px, calc(100vw - 24px)); }
   .nav-movel [aria-current="page"] { color: var(--brasa); }
   .folha-main { padding-bottom: 140px; }
   .datrics-abrir { bottom: 76px; }
+  .avisos { top: calc(var(--topo-h) + 8px); right: 8px; max-width: min(340px, calc(100vw - 16px)); }
   .selo-ia { bottom: 76px; max-width: calc(100vw - 150px); }
   .alternar-modo { bottom: 112px; }
 }
@@ -597,10 +603,43 @@ output { color: var(--tinta-3); font-size: 0.78rem; }
 .menu-pop-portal { position: fixed; z-index: 1000; min-width: 240px; max-width: min(320px, calc(100vw - 16px)); }
 .menu-pop-portal button { white-space: normal; }
 
-/* Entrada suave de conteúdo: respeita a preferência do sistema por movimento reduzido. */
-@keyframes textoEntra { from { opacity: 0; transform: translateY(16px); filter: blur(3px); } to { opacity: 1; transform: none; filter: none; } }
-.rota h1, .rota > .lead, .rota .secao, .rota .abertura, .rota .grade-2 > *, .rota .grade-3 > * { animation: textoEntra 520ms var(--curva) both; }
-.rota .secao:nth-of-type(2), .rota .grade-2 > :nth-child(2) { animation-delay: 70ms; }
-.rota .secao:nth-of-type(3), .rota .grade-2 > :nth-child(3) { animation-delay: 130ms; }
-.rota .secao:nth-of-type(4), .rota .grade-2 > :nth-child(4) { animation-delay: 190ms; }
-@media (prefers-reduced-motion: reduce) { .rota h1, .rota > .lead, .rota .secao, .rota .abertura, .rota .grade-2 > *, .rota .grade-3 > * { animation: none !important; } }
+/* As entradas agora são controladas pelo observador de rolagem da seção 21. */
+
+/* ---------- 21. Movimento suave: entradas discretas e reversíveis ---------- */
+.rota-entrando { animation: paginaChega 420ms cubic-bezier(.2,.7,.25,1) both; }
+@keyframes paginaChega {
+  from { opacity: 0; transform: translate3d(0, 10px, 0); }
+  to { opacity: 1; transform: none; }
+}
+[data-reveal] {
+  opacity: 0;
+  will-change: opacity, transform;
+  transition: opacity 420ms cubic-bezier(.22,.7,.2,1),
+              transform 460ms cubic-bezier(.22,.7,.2,1);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+[data-reveal="true"][data-reveal-tipo="subir"] { transform: translate3d(0, 16px, 0); }
+[data-reveal="true"][data-reveal-tipo="suave"] { transform: translate3d(0, 9px, 0); }
+[data-reveal="true"][data-reveal-tipo="zoom"] { transform: translate3d(0, 8px, 0) scale(.985); }
+/* Regra com maior especificidade garante que a posição final sempre vença
+   os deslocamentos direcionais, tanto ao subir quanto ao descer. */
+[data-reveal].revelado,
+[data-reveal].revelado[data-reveal-sentido] {
+  opacity: 1;
+  transform: translate3d(0,0,0) scale(1);
+}
+.rota h1, .rota h2, .rota h3 { text-wrap: balance; }
+.rota a, .rota button, .rota .btn, .nav-sec a, .nav-sec button {
+  transition: transform 180ms ease, box-shadow 220ms ease, background-color 220ms ease, color 220ms ease;
+}
+.rota a:hover, .rota button:hover, .rota .btn:hover { transform: translateY(-1px); }
+.rota .questao, .rota .cartao, .rota .card, .rota .painel {
+  transition: box-shadow 240ms ease, border-color 220ms ease;
+}
+.rota .questao:hover, .rota .cartao:hover, .rota .card:hover, .rota .painel:hover {
+  box-shadow: 0 5px 18px rgba(0,0,0,.08);
+}
+@media (prefers-reduced-motion: reduce) {
+  .rota-entrando, [data-reveal], .rota h1.revelado, .rota h2.revelado, .rota .abertura h1, .rota .olho { animation: none !important; transition: none !important; opacity: 1 !important; transform: none !important; filter: none !important; clip-path: none !important; }
+  .rota a:hover, .rota button:hover, .rota .btn:hover, .rota .questao:hover, .rota .cartao:hover, .rota .card:hover, .rota .painel:hover { transform: none !important; }
+}
