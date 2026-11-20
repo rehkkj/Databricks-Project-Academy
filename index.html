@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-tema="claro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Databricks Academy — Apostila interativa</title>
+  <meta name="description" content="Apostila interativa de Databricks: Lakehouse, Delta Lake, PySpark, Spark SQL, Auto Loader, Unity Catalog e Workflows, com exercícios corrigidos na hora e um tutor de IA.">
+  <meta property="og:title" content="Databricks Academy — Apostila interativa">
+  <meta property="og:description" content="Aulas curtas, prática a cada aula e um tutor que explica onde você errou.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary">
+  <meta name="theme-color" content="#f5f0e6">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%232b241c'/%3E%3Cpath d='M9 11l7-4 7 4-7 4zM9 16l7 4 7-4M9 21l7 4 7-4' fill='none' stroke='%23df7a4c' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&display=swap">
+  <link rel="stylesheet" href="estilo.css">
+  <script defer src="app.js"></script>
+  <script defer src="ia.js"></script>
+</head>
+<body>
+  <a class="pular" href="#principal">Pular para o conteúdo</a>
+  <div class="fundo" id="fundo" aria-hidden="true"><canvas id="fundoCanvas"></canvas></div>
+  <div class="cursor-fx" id="cursorFx" aria-hidden="true" hidden><i></i></div>
+  <div class="luz-fx" id="luzFx" aria-hidden="true" hidden></div>
+
+  <header class="topo">
+    <a class="marca" href="#home"><span class="marca-icone" id="marcaIcone">●</span><span class="marca-nome" id="marcaNome">Databricks Academy</span></a>
+    <nav class="nav-sec" aria-label="Seções">
+      <a href="#home" data-rota="home">Início</a>
+      <button type="button" class="gaveta-indice" data-abrir-aulas>Aulas</button>
+      <span class="ancora"><button type="button" data-abrir-ia aria-haspopup="menu" aria-expanded="false">IA ▾</button></span>
+      <a href="#mindmap" data-rota="mindmap">Mapa mental</a>
+      <a href="#skills" data-rota="skills">Skills</a>
+      <a href="#bookmarks" data-rota="bookmarks">Marcados</a>
+      <a href="#data-lab" data-rota="data-lab">Dados</a>
+      <a href="#admin" data-rota="admin">Editor</a>
+    </nav>
+    <div class="topo-dir">
+      <div class="nivel" id="nivel" role="group" aria-label="Nível das explicações da IA">
+        <button type="button" data-nivel="eli5">ELI5</button><button type="button" data-nivel="pleno">Pleno</button><button type="button" data-nivel="arquiteto">Arquiteto</button>
+      </div>
+      <button type="button" class="icone-btn" id="logsBtn" title="Avisos recentes" aria-label="Ver avisos recentes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M5 6h14M5 12h14M5 18h9"/></svg></button>
+      <button type="button" class="icone-btn" id="temaBtn" aria-label="Alternar tema"></button>
+      <button type="button" class="perfil-btn" id="perfilBtn" aria-label="Abrir perfil"></button>
+    </div>
+  </header>
+
+  <div class="estrutura" id="estrutura">
+    <aside class="indice" id="indice" aria-label="Sumário da apostila"></aside>
+    <main class="folha-main" id="principal" tabindex="-1"></main>
+  </div>
+
+  <button type="button" class="btn btn-mini alternar-modo" id="alternarModo" hidden></button>
+
+  <nav class="nav-movel" aria-label="Navegação principal">
+    <a href="#home" data-rota="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Início</a>
+    <button type="button" data-abrir-aulas><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 4h6a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H4zM20 4h-6a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h6z"/></svg>Aulas</button>
+    <span class="ancora"><button type="button" data-abrir-ia aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>IA</button></span>
+    <a href="#bookmarks" data-rota="bookmarks"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg>Marcados</a>
+    <a href="#admin" data-rota="admin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 20l4-1L19 8l-3-3L5 16zM14 7l3 3"/></svg>Editor</a>
+  </nav>
+
+  <div class="avisos" id="avisos" aria-live="polite"></div>
+  <noscript><p class="coluna">Esta apostila precisa de JavaScript ativado.</p></noscript>
+</body>
+</html>
