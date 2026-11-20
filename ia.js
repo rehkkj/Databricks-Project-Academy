@@ -464,8 +464,17 @@ function validarMultipla(x, cfg) {
   if (!isObj(x) || !String(x.p || "").trim() || !Array.isArray(x.o) || x.o.length !== 4) return null;
   const o = x.o.map((s) => tiraRotulo(typeof s === "string" ? s : ""));
   if (o.some((s) => !s || /^(alternativa|op[cç][aã]o)?\s*[a-d1-4]$/i.test(s)) || new Set(o.map(normCmp)).size < 4) return null;
-  const correta = tiraRotulo(x.correta || ""); if (!correta || !String(x.e || "").trim()) return null;
-  let a = o.findIndex((s) => s === correta); if (a < 0) a = o.findIndex((s) => normCmp(s) === normCmp(correta)); if (a < 0) return null;
+  let correta = tiraRotulo(x.correta || "");
+  let a = -1;
+  const indiceInformado = Number(x.a);
+  if (Number.isInteger(indiceInformado) && indiceInformado >= 0 && indiceInformado < 4) a = indiceInformado;
+  if (correta) {
+    const porTexto = o.findIndex((s) => s === correta);
+    const porNormalizado = porTexto < 0 ? o.findIndex((s) => normCmp(s) === normCmp(correta)) : porTexto;
+    if (porNormalizado >= 0) a = porNormalizado;
+  }
+  if (a < 0 || !String(x.e || x.explicacao || x.explanation || "").trim()) return null;
+  correta = o[a];
   const nc = normCmp(o[a]);
   if (nc.length >= 14 && normCmp(x.p).includes(nc)) return null;
   if (nc.length >= 6 && x.codigo && normCmp(x.codigo).includes(nc)) return null;
@@ -475,25 +484,43 @@ function validarMultipla(x, cfg) {
   return { p: esc(String(x.p).trim()) + (x.codigo && String(x.codigo).trim() ? "<pre><code>" + esc(String(x.codigo)) + "</code></pre>" : ""), o: emb, a: emb.indexOf(certa), e: String(x.e).trim(), lv: ["IA", nivel, tipo].filter(Boolean).join(" · "), _raw: String(x.p).trim() };
 }
 function validarPratica(x) {
-  if (!isObj(x) || !String(x.p || "").trim() || !["SQL", "Python", "PySpark"].includes(x.linguagem) || !String(x.solucao || "").trim()) return null;
-  return { mode: "code", language: x.linguagem, p: esc(String(x.p).trim()), task: String(x.instrucoes || ""), starter: String(x.codigoInicial || ""), solution: String(x.solucao), e: String(x.e || ""), lv: "Prática de código · " + x.linguagem, _raw: String(x.p).trim() };
+  if (!isObj(x)) return null;
+  const enunciado = x.p || x.enunciado || x.prompt || x.question || x.objetivo;
+  const linguagem = String(x.linguagem || x.language || "Python").trim();
+  const solucao = x.solucao || x.solution || x.resposta || x.codigoSolucao;
+  if (!String(enunciado || "").trim() || !["SQL", "Python", "PySpark"].includes(linguagem) || !String(solucao || "").trim()) return null;
+  return { mode: "code", language: linguagem, p: esc(String(enunciado).trim()), task: String(x.instrucoes || x.instructions || x.tarefa || ""), starter: String(x.codigoInicial || x.starter || x.codigo_inicial || ""), solution: String(solucao), e: String(x.e || x.explicacao || x.explanation || ""), lv: "Prática de código · " + linguagem, _raw: String(enunciado).trim() };
 }
 function promptQuestoes(cfg, n, modo, anteriores) {
   const pegadinha = cfg.pegadinhas ? "Inclua pegadinhas justas: detalhes pequenos e relevantes que mudam a resposta; não use ambiguidade nem informação escondida." : "Não inclua pegadinhas; formule questões diretas e sem detalhes traiçoeiros.";
   const evitar = anteriores.length ? "\nNão repita nem parafraseie estes enunciados já usados: " + anteriores.slice(-12).map((p) => "«" + p.slice(0, 100) + "»").join("; ") : "";
   const extra = cfg.extra ? "\nInstruções e material de referência do aluno:\n" + cfg.extra.slice(0, 6500) : "";
-  const base = "Tema: " + cfg.tema + ". Dificuldade: " + cfg.dif + ". Linguagem do código: " + cfg.ling + "." + extra + evitar + "\n" + pegadinha;
+  const base = "Tema: " + cfg.tema + ". Dificuldade: " + cfg.dif + ". Linguagem do código: " + cfg.ling + "." + (cfg.ling === "Python" ? " O contexto principal é Python e ciência de dados; não force exemplos de Databricks se não forem pertinentes." : "") + extra + evitar + "\n" + pegadinha;
   if (modo === "ide") return base + "\nCrie " + n + " exercício(s) de prática de código em que o aluno escreve ou completa o código. A solução de referência deve ser completa e NÃO pode aparecer no objetivo, nas instruções nem no código inicial.\n" +
     'Responda somente com o JSON: [{"tipo":"Prática de código","linguagem":"SQL|Python|PySpark","p":"objetivo curto","instrucoes":"requisitos detalhados","codigoInicial":"esqueleto incompleto opcional","solucao":"solução de referência completa","e":"conceito praticado"}]';
   const tipo = cfg.tipo === "Misto" ? "Conceitual, Código ou Cenário" : cfg.tipo === "Código (SQL/PySpark)" ? "Código" : cfg.tipo === "Cenário prático" ? "Cenário" : "Conceitual";
   return base + "\nCrie " + n + " questão(ões) de múltipla escolha do tipo " + tipo + ", em português do Brasil, sempre no contexto Databricks. Exatamente 4 alternativas e exatamente 1 correta. Enunciados e alternativas curtos. Cenário: situação real de trabalho e a melhor decisão técnica. Conceitual: compreensão e aplicação, não decoreba. Código: trecho neutro ou esqueleto incompleto que não entregue a resposta; sem código use \"codigo\":\"\". Alternativas com texto completo e significativo — nunca apenas \"A\", \"B\", \"Alternativa A\" ou \"Opção B\". Distratores plausíveis. Varie a posição da correta.\n" +
     'Responda somente com o JSON: {"questions":[{"nivel":"Fácil|Médio|Difícil","tipo":"Conceitual|Código|Cenário","p":"enunciado","codigo":"","o":["texto completo da alternativa 1","texto completo da alternativa 2","texto completo da alternativa 3","texto completo da alternativa 4"],"a":0,"correta":"copie exatamente o texto da alternativa correta","e":"explique por que a correta é certa e as demais não"}]}. "a" é inteiro de 0 a 3.';
 }
+function extrairItensGeracao(texto) {
+  const limpo = limparFences(String(texto || ""));
+  try {
+    const obj = objetoJson(limpo);
+    if (Array.isArray(obj)) return obj;
+    for (const k of ["questions", "questoes", "items", "itens", "exercises", "exercicios", "data", "results"]) {
+      if (Array.isArray(obj[k])) return obj[k];
+    }
+  } catch (_) {}
+  const arr = itensArray(limpo);
+  return Array.isArray(arr.itens) ? arr.itens : [];
+}
 async function lote(cfg, n, modo, anteriores, sinal) {
-  const r = await pedir({ rotulo: "Gerar questões", json: true, temperature: 0.5, signal: sinal, max_tokens: (modo === "ide" ? 750 : 520) * n + 300,
-    system: "Você é o Datrics, gerador de questões desta apostila de Databricks. " + ESCOPO + " Responda somente JSON válido, sem markdown.",
+  const r = await pedir({ rotulo: "Gerar questões", json: true, temperature: 0.35, signal: sinal, max_tokens: (modo === "ide" ? 900 : 700) * n + 450,
+    system: (cfg.ling === "Python" ? "Você é o Datrics, professor especialista em Python e ciência de dados." : "Você é o Datrics, gerador de questões desta apostila de Databricks. " + ESCOPO) + " Gere exatamente o formato solicitado. Responda somente JSON válido, sem markdown ou texto externo.",
     messages: [{ role: "user", content: promptQuestoes(cfg, n, modo, anteriores) }] });
-  return itensArray(r).itens.map((x) => modo === "ide" ? validarPratica(x) : validarMultipla(x, cfg)).filter(Boolean).slice(0, n);
+  const itens = extrairItensGeracao(r);
+  const validadas = itens.map((x) => modo === "ide" ? validarPratica(x) : validarMultipla(x, cfg)).filter(Boolean).slice(0, n);
+  return validadas;
 }
 async function gerarCards(cfg, aula, sinal) {
   const r = await pedir({ rotulo: "Cards de estudo", json: true, temperature: 0.35, max_tokens: 1100, signal: sinal,
@@ -503,11 +530,17 @@ async function gerarCards(cfg, aula, sinal) {
   return itensArray(r.slice(r.indexOf('"cards"'))).itens.slice(0, 4).map((c) => ({ title: String(c.title || "").slice(0, 100), concept: String(c.concept || "").slice(0, 300), explanation: String(c.explanation || "").slice(0, 900), example: String(c.example || "").slice(0, 1200) })).filter((c) => c.concept || c.explanation);
 }
 async function gerarTextoAula(cfg, parte, sinal) {
-  const r = await pedir({ rotulo: "Conteúdo da aula", json: true, temperature: 0.35, max_tokens: 950, signal: sinal,
-    system: "Você é um professor técnico de Databricks. Escreva conteúdo didático em português do Brasil, correto, claro e progressivo. Responda somente JSON válido.",
-    messages: [{ role: "user", content: "Escreva o texto principal de uma aula completa (aprox. 350 a 550 palavras), com subtítulos Markdown simples, explicação, exemplo prático e boas práticas. Não crie questões (elas serão geradas separadamente).\nTema: " + cfg.tema + "\nAula: " + parte.titulo + "\nFoco: " + (parte.contexto || parte.titulo) + "\nDificuldade: " + cfg.dif + "\nFormato: {\"body\":\"texto completo\"}" }],
-    validar: (t) => { const d = objetoJson(t); if (typeof d.body !== "string" || d.body.trim().length < 120) throw new Error("Texto didático muito curto."); } });
-  return String(objetoJson(r).body).slice(0, 9000);
+  /* Texto de aula é solicitado em Markdown puro, não em JSON. Isso evita
+     que aspas, quebras de linha e caracteres de controle do conteúdo didático
+     invalidem o JSON de provedores com compatibilidade imperfeita. O orquestrador
+     também consegue continuar respostas interrompidas pelo limite de tokens. */
+  const r = await pedir({ rotulo: "Conteúdo da aula", json: false, temperature: 0.3, max_tokens: 1600, timeout: 60000, signal: sinal,
+    system: "Você é um professor especialista em " + (cfg.ling === "Python" ? "Python e ciência de dados" : "Databricks e engenharia de dados") + ". Escreva em português do Brasil, com precisão técnica, clareza e progressão didática. Entregue diretamente o conteúdo da aula em Markdown. Não use JSON, não envolva a resposta em bloco de código e não crie questões.",
+    messages: [{ role: "user", content: "Produza o texto principal de uma aula completa, com aproximadamente 350 a 500 palavras. Organize com título e subtítulos Markdown; inclua explicação dos conceitos, exemplo prático comentado e boas práticas. Não crie questões (elas serão geradas separadamente).\n\nTema do módulo: " + cfg.tema + "\nAula: " + parte.titulo + "\nFoco: " + (parte.contexto || parte.titulo) + (cfg.extra ? "\n\nMaterial de referência enviado pelo usuário (use como base e preserve os tópicos, sem ignorar ou substituir):\n" + cfg.extra.slice(0, 4500) : "") + "\n\nNível: " + cfg.dif + "\n\nEntregue somente o conteúdo didático final, sem prefácio sobre o que vai fazer." }],
+    validar: (t) => { const limpo = textoFinal(t).trim(); if (limpo.length < 450 || limpo.split(/\s+/).length < 70) throw new Error("Texto didático incompleto ou muito curto."); } });
+  const corpo = textoFinal(r).trim();
+  if (corpo.length < 450) throw new Error("Texto didático incompleto ou muito curto.");
+  return corpo.slice(0, 14000);
 }
 async function revisar(questoes, sinal) {
   const gerador = ultimoOk; const outro = conectados().find((id) => id !== gerador && !pausado(id)) || gerador;
@@ -541,8 +574,21 @@ async function encherQuestoes(t, parte, progresso, sinal) {
     const n = t.cfg.tipo === "Misto" ? 1 : Math.min(falta, modo === "ide" ? 2 : 5);
     progresso("Gerando questões " + (parte.all.length + 1) + "–" + (parte.all.length + n) + " de " + parte.qtd + (parte.titulo ? " · " + parte.titulo : "") + "…");
     const cfgParte = Object.assign({}, t.cfg, parte.contexto ? { tema: t.cfg.tema + " — " + parte.contexto } : {});
-    const novas = await lote(cfgParte, n, modo, t.anteriores, sinal);
-    if (!novas.length) { if (++vazios >= 2) throw new Error("A IA devolveu duas respostas sem questões válidas seguidas."); continue; }
+    let novas = await lote(cfgParte, n, modo, t.anteriores, sinal);
+    if (!novas.length && modo === "ide") {
+      progresso("Ajustando o formato da atividade e tentando novamente…");
+      novas = await lote(cfgParte, n, "mc", t.anteriores, sinal);
+    }
+    if (!novas.length) {
+      vazios++;
+      if (vazios >= 2) {
+        parte.qtd = parte.all.length;
+        parte.falhaQuestoes = "Não foi possível validar as questões geradas nesta etapa; o conteúdo da aula será salvo mesmo assim.";
+        aviso(parte.falhaQuestoes, true);
+        break;
+      }
+      continue;
+    }
     vazios = 0; parte.all.push(...novas); t.anteriores.push(...novas.map((q) => q._raw)); t.batchesCompleted = (t.batchesCompleted || 0) + 1;
     gravarTrabalho(t);
   }
@@ -719,7 +765,7 @@ const RX = {
   conteudo: /\b(m[oó]dulos?|unidades?|trilhas?|cap[ií]tulos?|aulas?|material de estudo|cards? explicativos?|conte[uú]do did[aá]tico)\b/i,
   modulo: /\b(m[oó]dulos?|unidades?|trilhas?|cap[ií]tulos?)\b/i,
   criarAula: /\b(crie|criar|gere|gerar|monte|montar|elabore|elaborar|prepare|preparar|produza|produzir|fa[cç]a|adicione|adicionar)\s+(?:(?:para mim)\s+)?(?:(?:uma?|as?|os?)\s+)?(?:nova\s+|novas\s+|novos?\s+)?(?:\d+\s+)?(?:aulas?|material|cards?|conte[uú]do)\b/i,
-  criarModulo: /\b(crie|criar|gere|gerar|monte|montar|elabore|elaborar|prepare|preparar|adicione|adicionar|fa[cç]a)\s+(?:(?:para mim)\s+)?(?:(?:um|uma|os|as)\s+)?(?:novo\s+|nova\s+|novos\s+|novas\s+)?(?:m[oó]dulos?|unidades?|trilhas?|cap[ií]tulos?)\b/i,
+  criarModulo: /\b(crie|criar|gere|gerar|monte|montar|elabore|elaborar|prepare|preparar|adicione|adicionar|fa[cç]a)\s+(?:(?:para mim)\s+)?(?:(?:um|uma|os|as)\s+)?(?:novo\s+|nova\s+|novos\s+|novas\s+)?(?:\d{1,2}\s+)?(?:m[oó]dulos?|unidades?|trilhas?|cap[ií]tulos?)\b/i,
   editar: /\b(mude|mudar|altere|alterar|troque|trocar|edite|editar|corrija|corrigir|renomeie|renomear|ajuste|ajustar|deixe|coloque|reescreva|reescrever|aumente|diminua)\b/i,
   alvoEdicao: /\b(quest|aula|m[oó]dulo|tema|cor|cores|site|interface|fonte|layout|efeito|fundo|apar[eê]ncia|visual|t[ií]tulo|nome|paleta|escuro|claro|cursor)/i
 };
@@ -730,7 +776,7 @@ function extrairTema(t) {
 }
 function quantidade(t, padrao) { const m = t.match(/(\d{1,2})\s*(?:\w+\s+)?(?:quest|exerc|desaf)/i) || t.match(/(?:quest\S*|exerc\S*|desaf\S*)\D{0,12}(\d{1,2})/i); return Math.min(25, Math.max(1, m ? Number(m[1]) : padrao)); }
 const dificuldade = (t) => /f[aá]c/i.test(t) ? "Fácil" : /dif[ií]c/i.test(t) ? "Difícil" : "Médio";
-const linguagem = (t) => /\bsql\b/i.test(t) ? "SQL" : /pyspark/i.test(t) ? "PySpark" : "Misto";
+const linguagem = (t) => /pyspark/i.test(t) ? "PySpark" : /python|pandas|numpy|matplotlib|jupyter/i.test(t) ? "Python" : /\bsql\b/i.test(t) ? "SQL" : "Misto";
 function aulaMencionada(t) {
   const n = normTexto(t);
   return App.aulas().find((l) => n.includes(normTexto(l.t)) || n.includes(l.id.replace(/[-_]/g, " ")) || normTexto(l.t).split(/\s+/).filter((w) => w.length >= 5).some((w) => n.includes(w))) || App.aulaAtual();
@@ -767,14 +813,38 @@ async function criarQuestoesChat(texto) {
   const alvo = await executarTrabalho(t, statusChat, controleAtivo.signal);
   return "Pronto: " + t.partes[0].all.length + " questão(ões) sobre **" + cfg.tema + "** em [" + alvo.t + "](#" + encodeURIComponent(alvo.id) + "). Elas aparecem no fim da aula.";
 }
+function tituloModuloDoPedido(texto) {
+  const limpo = String(texto || "").replace(/\*\*/g, "");
+  const m = limpo.match(/(?:^|\n)\s*M[oó]dulo\s+\d+\s*[:：–-]\s*([^\n]+)/i);
+  return m ? m[1].trim().replace(/[.。]+$/, "").slice(0, 120) : "";
+}
+function partesDoModulo(texto, tema) {
+  const linhas = String(texto || "").replace(/\r/g, "").split("\n");
+  const marcadores = [];
+  linhas.forEach((linha, i) => {
+    const m = linha.match(/^\s*\d{1,2}\.\s+\*\*(.{3,100}?)\*\*\s*$/) || linha.match(/^\s*\d{1,2}\.\s+(.{3,100})\s*$/);
+    if (m) marcadores.push({ i, titulo: m[1].replace(/\*\*/g, "").trim() });
+  });
+  if (!marcadores.length) return [
+    ["Fundamentos e conceitos essenciais", "fundamentos, definições e arquitetura"],
+    ["Sintaxe e estruturas principais", "sintaxe, elementos da linguagem e estruturas fundamentais"],
+    ["Aplicação prática e boas práticas", "exemplos práticos, bibliotecas, boas práticas e cenários reais"]
+  ];
+  return marcadores.slice(0, 12).map((m, i) => {
+    const fim = i + 1 < marcadores.length ? marcadores[i + 1].i : linhas.length;
+    const contexto = linhas.slice(m.i + 1, fim).join("\n").trim().slice(0, 2200);
+    return [m.titulo, contexto || ("Conteúdo e aplicação prática de " + m.titulo + " em " + tema)];
+  });
+}
 async function criarConteudo(texto) {
-  const tema = extrairTema(texto);
-  if (tema.length < 3) return "Claro. Qual tema você quer estudar? Diga o assunto (por exemplo: Delta Lake, Unity Catalog, PySpark ou SQL) e eu preparo aulas com cards.";
   const ehModulo = RX.criarModulo.test(texto);
+  const tituloInformado = ehModulo ? tituloModuloDoPedido(texto) : "";
+  const tema = tituloInformado || extrairTema(texto);
+  if (tema.length < 3) return "Claro. Qual tema você quer estudar? Diga o assunto (por exemplo: Delta Lake, Unity Catalog, PySpark ou SQL) e eu preparo aulas com cards.";
   const total = RX.questoes.test(texto) || ehModulo || RX.criarAula.test(texto) ? quantidade(texto, 5) : 0;
-  const base = ehModulo ? [["Fundamentos e conceitos essenciais", "fundamentos, definições e arquitetura"], ["Implementação e prática", "implementação prática, exemplos e uso no dia a dia"], ["Boas práticas e cenários reais", "boas práticas, otimização, governança e cenários reais"]] : [[tema, "introdução e conceitos centrais"]];
+  const base = ehModulo ? partesDoModulo(texto, tema) : [[tema, "introdução e conceitos centrais"]];
   const partes = base.map(([titulo, contexto], i) => ({ titulo, contexto, qtd: Math.floor(total / base.length) + (i < total % base.length ? 1 : 0), all: [], intro: "Aula sobre " + tema + " com foco em " + contexto + ". Leia os cards antes de praticar." }));
-  const cfg = { tema, dif: dificuldade(texto), tipo: "Misto", ling: linguagem(texto), extra: "", pegadinhas: false, cards: true };
+  const cfg = { tema, dif: dificuldade(texto), tipo: "Múltipla escolha", ling: linguagem(texto), extra: String(texto || "").slice(0, 6500), pegadinhas: false, cards: true };
   const t = novoTrabalho("tutor-study-lesson", cfg, partes, { modulo: ehModulo });
   const alvo = await executarTrabalho(t, statusChat, controleAtivo.signal);
   return (ehModulo ? "Módulo **" + tema + "** criado com " + partes.length + " aulas" : "Aula **" + tema + "** criada") + (total ? " e " + total + " questões" : "") + ". Comece por [" + alvo.t + "](#" + encodeURIComponent(alvo.id) + ").";

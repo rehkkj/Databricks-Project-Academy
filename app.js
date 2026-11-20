@@ -84,7 +84,7 @@ const K = {
   rascunhos: "apostilaDatabricksCodeDrafts", tema: "apostilaDatabricksTheme", ajustes: "apostilaDatabricksSettings",
   modos: "apostilaDatabricksProfiles", modoAtivo: "apostilaDatabricksActiveProfile", temasSalvos: "apostilaDatabricksSavedThemes",
   logs: "databricksAcademySafeLogs", historico: "apostilaDatabricksTutorHistory", perfil: "databricksAcademyUserProfile",
-  marcas: "dbAcademyLearningMarksV1", nivel: "dbAcademyLearningLevelV1", mapa: "dbAcademyMindmapLastV1", leve: "apostilaLite"
+  marcas: "dbAcademyLearningMarksV1", nivel: "dbAcademyLearningLevelV1", mapa: "dbAcademyMindmapLastV1", leve: "apostilaLite", curriculo: "apostilaDatabricksCurriculumVersion"
 };
 const LIMITE_MODOS = 20, LIMITE_TEMAS = 30;
 const armazem = {
@@ -105,40 +105,686 @@ function gravarJuntos(pares) {
 
 /* ---------- 3. Conteúdo padrão ---------- */
 const CONTEUDO_PADRAO = [
-  { t: "Fundamentos do Databricks", l: [
-    { id: "lakehouse", t: "O que é o Lakehouse", d: "8 min", h: "O Lakehouse combina a flexibilidade de um data lake com recursos de gestão, confiabilidade e desempenho associados a um data warehouse.\n\nNo Databricks, os dados podem ser armazenados em tabelas Delta sobre armazenamento em nuvem. Compute, armazenamento e governança são componentes distintos.", q: [
-      { p: "Qual característica melhor descreve a arquitetura Lakehouse?", o: ["Combina armazenamento aberto de data lake com recursos de gestão e confiabilidade.", "Exige que todos os dados sejam armazenados em um banco relacional proprietário.", "Elimina a necessidade de processamento distribuído.", "Armazena apenas dados estruturados em memória."], a: 0, e: "O Lakehouse aproxima a flexibilidade do data lake dos recursos de confiabilidade e gestão de um warehouse." },
-      { p: "Em uma arquitetura Databricks, o armazenamento dos dados costuma ficar:", o: ["No armazenamento de objetos em nuvem, separado do compute.", "Dentro do navegador de cada usuário.", "Somente no disco local do driver.", "Em um arquivo temporário apagado após cada consulta."], a: 0, e: "Separar armazenamento e compute permite escalar e administrar cada camada independentemente." }
-    ] },
-    { id: "workspace", t: "Workspace, compute e notebooks", d: "7 min", h: "O workspace organiza notebooks, arquivos, consultas e outros ativos de trabalho. Notebooks podem combinar código, texto e visualizações.\n\nCompute é o recurso que executa as cargas de trabalho. Escolha um tipo e tamanho compatíveis com a tarefa, e encerre recursos interativos quando não forem mais necessários.", q: [
-      { p: "Qual é a função principal do compute?", o: ["Executar consultas e código de processamento.", "Armazenar permanentemente todas as tabelas Delta.", "Definir os usuários do provedor de nuvem.", "Substituir o catálogo de dados."], a: 0, e: "Compute fornece recursos de execução; os dados podem permanecer em armazenamento separado." }
-    ] }
-  ] },
-  { t: "Delta Lake e SQL", l: [
-    { id: "delta-lake", t: "Tabelas Delta e transações", d: "9 min", h: "Delta Lake adiciona um log transacional ao armazenamento de dados, permitindo operações como leituras consistentes, controle de concorrência e evolução de esquema.\n\nUse tabelas gerenciadas conforme as necessidades de retenção e governança. Operações de escrita devem ser planejadas para evitar sobrescritas acidentais.", q: [
-      { p: "O que o log transacional do Delta Lake possibilita?", o: ["Registrar alterações e oferecer leituras consistentes da tabela.", "Executar código Python sem compute.", "Substituir todas as permissões do catálogo.", "Converter automaticamente qualquer arquivo em tabela sem configuração."], a: 0, e: "O log Delta acompanha as transações da tabela e viabiliza recursos de consistência e concorrência." },
-      { p: "Qual comando grava um DataFrame como tabela Delta usando PySpark?", o: ["df.write.format(\"delta\").saveAsTable(\"catalogo.esquema.tabela\")", "df.read.format(\"delta\").saveAsTable(\"catalogo.esquema.tabela\")", "spark.stop(\"catalogo.esquema.tabela\")", "df.sql(\"CREATE DELTA TABLE\")"], a: 0, e: "O writer do DataFrame permite definir o formato Delta e salvar o resultado como tabela." }
-    ] },
-    { id: "spark-sql", t: "Consultas com Spark SQL", d: "8 min", h: "Spark SQL permite consultar tabelas com SQL e também pode ser usado em notebooks. Prefira selecionar as colunas necessárias e aplicar filtros que reduzam os dados processados.\n\nEm ambientes com Unity Catalog, referencie tabelas usando o formato catalogo.esquema.tabela quando aplicável.", q: [
-      { p: "Como consultar somente as colunas id e nome da tabela clientes no schema vendas?", o: ["SELECT id, nome FROM catalogo.vendas.clientes", "SELECT * FROM id, nome WHERE vendas.clientes", "READ clientes COLUMNS id, nome", "SHOW id, nome IN catalogo.vendas.clientes"], a: 0, e: "A forma de três partes identifica catálogo, schema e tabela; a lista de colunas evita ler colunas desnecessárias." }
-    ] }
-  ] },
-  { t: "Engenharia de dados", l: [
-    { id: "pyspark", t: "Transformações com PySpark", d: "8 min", h: "DataFrames do PySpark representam dados distribuídos e permitem compor transformações como select, filter e withColumn.\n\nMuitas transformações são avaliadas de forma preguiçosa: o plano é executado quando uma ação, como count ou write, é chamada. Isso permite ao Spark otimizar o plano.", q: [
-      { p: "Qual chamada normalmente dispara a execução de um plano de DataFrame?", o: ["df.count()", "df.select(\"coluna\")", "df.filter(\"valor > 0\")", "df.withColumn(\"nova\", expr)"], a: 0, e: "count é uma ação. select, filter e withColumn são transformações que compõem o plano." }
-    ] },
-    { id: "autoloader", t: "Ingestão incremental com Auto Loader", d: "8 min", h: "O Auto Loader detecta e processa arquivos novos de forma incremental, sendo útil para ingestão contínua de dados em armazenamento de objetos.\n\nA configuração normalmente define o formato de origem, o caminho dos arquivos e diretórios de checkpoint e schema para acompanhar o progresso e a evolução do esquema.", q: [
-      { p: "Para que serve o Auto Loader?", o: ["Detectar e ingerir arquivos novos de forma incremental.", "Substituir o armazenamento Delta por memória.", "Criar usuários e grupos do workspace.", "Executar apenas consultas SQL interativas."], a: 0, e: "O Auto Loader oferece ingestão incremental de arquivos, com suporte a estado e evolução de esquema." }
-    ] }
-  ] },
-  { t: "Governança e operações", l: [
-    { id: "unity-catalog", t: "Governança com Unity Catalog", d: "8 min", h: "Unity Catalog centraliza a governança de dados e ativos no Databricks. A hierarquia usual é metastore, catálogo, schema e objeto, como uma tabela ou view.\n\nAplique o princípio do menor privilégio: conceda apenas as permissões necessárias e revise acessos regularmente.", q: [
-      { p: "Qual é a hierarquia usual para identificar uma tabela no Unity Catalog?", o: ["catalogo.esquema.tabela", "tabela.catalogo.esquema", "workspace.cluster.tabela", "metastore.usuario.arquivo"], a: 0, e: "Uma tabela é normalmente referenciada pelo catálogo, schema e nome do objeto." }
-    ] },
-    { id: "workflows", t: "Workflows e jobs", d: "7 min", h: "Jobs e Workflows automatizam tarefas, podem organizar etapas dependentes e permitem configurar agenda, compute, parâmetros e notificações.\n\nTorne as tarefas idempotentes sempre que possível, monitore falhas e evite incluir credenciais diretamente em notebooks ou código.", q: [
-      { p: "Qual prática ajuda a tornar um job de dados mais confiável?", o: ["Monitorar falhas e projetar tarefas idempotentes.", "Guardar senhas diretamente no notebook.", "Ignorar dependências entre tarefas.", "Executar tudo no computador pessoal do autor."], a: 0, e: "Monitoramento e idempotência facilitam recuperação e reexecução segura de tarefas." }
-    ] }
-  ] }
+  {
+    "t": "Fundamentos do Databricks",
+    "l": [
+      {
+        "id": "lakehouse",
+        "t": "O que é o Lakehouse",
+        "d": "12 min",
+        "h": "## O que é uma arquitetura Lakehouse\n\nLakehouse é uma arquitetura que combina a flexibilidade e o custo eficiente de um data lake com recursos de gestão, confiabilidade e desempenho associados a um data warehouse. A proposta é trabalhar com diferentes tipos de dados e cargas de trabalho sobre uma base de armazenamento aberta, sem criar cópias desnecessárias para cada ferramenta.\n\nNo Databricks, tabelas Delta são frequentemente usadas como camada confiável para dados armazenados em object storage na nuvem. O formato Delta acrescenta um log transacional, controle de versões e validações ao armazenamento em arquivos Parquet.\n\n## Por que usar Lakehouse\n\n- **Dados diversos:** permite trabalhar com dados estruturados, semiestruturados e não estruturados.\n- **Separação de responsabilidades:** armazenamento e compute podem escalar de forma independente.\n- **Governança:** políticas de acesso e descoberta podem ser aplicadas de forma centralizada.\n- **Múltiplas cargas:** engenharia, BI, analytics e machine learning podem compartilhar dados governados.\n\n## Data lake, data warehouse e Lakehouse\n\nUm data lake costuma priorizar flexibilidade e armazenamento de baixo custo, mas pode exigir mais trabalho para garantir qualidade e consistência. Um data warehouse tradicional prioriza dados estruturados, modelagem e consultas analíticas. O Lakehouse procura aproximar esses benefícios, mantendo formatos abertos e processamento distribuído.\n\n## Exemplo de fluxo\n\nUma equipe pode receber arquivos brutos de vendas, validar os registros, padronizar colunas e publicar tabelas prontas para análise. O mesmo conjunto governado pode alimentar dashboards e modelos analíticos.\n\n```python\n# Exemplo ilustrativo de leitura de uma tabela Delta\ndf = spark.read.format(\"delta\").load(\"/dados/vendas\")\ndf.select(\"data\", \"categoria\", \"valor\").show(5)\n```\n\nA escolha da arquitetura não elimina a necessidade de modelagem, monitoramento ou governança. Ela oferece uma base comum para implementar esses cuidados.",
+        "q": [
+          {
+            "p": "Qual é a ideia central de uma arquitetura Lakehouse?",
+            "o": [
+              "Combinar flexibilidade de data lake com confiabilidade e gestão de warehouse.",
+              "Substituir todo armazenamento em nuvem por bancos locais.",
+              "Executar consultas apenas em memória, sem persistência.",
+              "Manter uma cópia isolada dos dados para cada equipe."
+            ],
+            "a": 0,
+            "e": "O Lakehouse busca unir armazenamento aberto e flexível com recursos de confiabilidade, governança e desempenho."
+          },
+          {
+            "p": "Qual recurso do Delta Lake ajuda a oferecer transações confiáveis sobre arquivos?",
+            "o": [
+              "Log transacional da tabela.",
+              "Interface gráfica do notebook.",
+              "Cache do navegador.",
+              "Arquivo CSV de configuração do cluster."
+            ],
+            "a": 0,
+            "e": "O log transacional registra alterações e permite controlar versões e concorrência."
+          },
+          {
+            "p": "Por que separar armazenamento e compute pode ser vantajoso?",
+            "o": [
+              "Permite dimensionar custos e capacidade de cada camada de forma independente.",
+              "Obriga a duplicar os dados em todos os clusters.",
+              "Impede que diferentes equipes consultem a mesma tabela.",
+              "Elimina a necessidade de controlar permissões."
+            ],
+            "a": 0,
+            "e": "Separar as camadas permite ajustar recursos de processamento sem mover os dados armazenados."
+          }
+        ],
+        "studyCards": [
+          {
+            "title": "Lakehouse em uma frase",
+            "concept": "Uma base comum para armazenar, processar e governar diferentes tipos de dados.",
+            "explanation": "A arquitetura aproxima a flexibilidade de um data lake dos controles e da confiabilidade esperados em um warehouse. O objetivo é reduzir silos e cópias, sem abrir mão de qualidade e governança.",
+            "example": "Arquivos brutos → tabelas Delta confiáveis → consultas SQL, dashboards e modelos analíticos."
+          },
+          {
+            "title": "O papel do Delta Lake",
+            "concept": "Delta Lake adiciona transações e controle de versões às tabelas.",
+            "explanation": "O log transacional acompanha operações de escrita e permite leituras consistentes, histórico e validações. Os dados continuam armazenados em arquivos, normalmente no object storage.",
+            "example": "spark.read.format(\"delta\").load(\"/dados/vendas\")"
+          }
+        ]
+      },
+      {
+        "id": "workspace",
+        "t": "Workspace, compute e notebooks",
+        "d": "11 min",
+        "h": "## Organização do trabalho\n\nO workspace reúne ativos usados no desenvolvimento e na operação de dados: notebooks, arquivos, consultas, dashboards, jobs e outros recursos. Ele facilita a colaboração, mas não deve ser confundido com o local físico onde todos os dados são armazenados.\n\nNotebooks combinam células de código, texto e resultados. Podem ser usados para exploração, desenvolvimento de pipelines, documentação e análises reproduzíveis.\n\n## O que é compute\n\nCompute é a capacidade de processamento usada para executar consultas e código. Dependendo da carga de trabalho, pode envolver clusters, SQL warehouses ou compute serverless, conforme os recursos habilitados no workspace.\n\nDimensione o compute conforme volume, concorrência, latência esperada e custo. Um recurso maior nem sempre resolve um pipeline mal otimizado.\n\n## Boas práticas com notebooks\n\n1. Divida o trabalho em etapas pequenas e nomeadas.\n2. Documente premissas, origem dos dados e resultado esperado.\n3. Evite credenciais fixas no código.\n4. Separe exploração interativa de tarefas recorrentes de produção.\n5. Encerre recursos interativos quando não forem mais necessários.\n\n## Exemplo de análise em notebook\n\n```python\nvendas = spark.table(\"comercial.gold.vendas\")\nresumo = vendas.groupBy(\"categoria\").sum(\"valor\")\ndisplay(resumo)\n```\n\nO notebook organiza a análise; a execução acontece no compute selecionado. O resultado pode ser compartilhado ou transformado em uma tarefa agendada.",
+        "q": [
+          {
+            "p": "Qual é a função de um workspace no Databricks?",
+            "o": [
+              "Organizar ativos de trabalho, como notebooks, consultas e jobs.",
+              "Armazenar obrigatoriamente todos os arquivos de dados.",
+              "Substituir o armazenamento de objetos da nuvem.",
+              "Executar código sem qualquer recurso de processamento."
+            ],
+            "a": 0,
+            "e": "O workspace organiza os ativos e a colaboração; os dados podem ficar em armazenamento separado."
+          },
+          {
+            "p": "O que fornece capacidade para executar o código de um notebook?",
+            "o": [
+              "Compute configurado para a carga de trabalho.",
+              "O tema visual selecionado pelo usuário.",
+              "A lista de favoritos do navegador.",
+              "O nome do arquivo do notebook."
+            ],
+            "a": 0,
+            "e": "O compute fornece os recursos de CPU, memória e execução necessários."
+          },
+          {
+            "p": "Qual prática é recomendada para notebooks usados em produção?",
+            "o": [
+              "Documentar etapas e evitar credenciais diretamente no código.",
+              "Manter senhas em células de texto para facilitar o acesso.",
+              "Executar manualmente sem monitoramento.",
+              "Misturar dados de teste e produção sem identificação."
+            ],
+            "a": 0,
+            "e": "Documentação, gestão segura de segredos e monitoramento tornam o trabalho mais confiável."
+          }
+        ],
+        "studyCards": [
+          {
+            "title": "Workspace não é armazenamento",
+            "concept": "Workspace organiza ativos; tabelas e arquivos podem residir no armazenamento em nuvem.",
+            "explanation": "Notebooks e consultas são recursos de trabalho. Os dados persistentes costumam ficar em storage externo, acessados pelo compute.",
+            "example": "Notebook: análise_vendas | Tabela: comercial.gold.vendas"
+          },
+          {
+            "title": "Escolha de compute",
+            "concept": "Dimensione processamento de acordo com a carga, não por tentativa aleatória.",
+            "explanation": "Considere tamanho dos dados, paralelismo, número de usuários, tempo de resposta e orçamento. Revise métricas antes de aumentar recursos.",
+            "example": "Carga pequena e exploratória → compute enxuto; processamento distribuído recorrente → compute dimensionado e monitorado."
+          }
+        ]
+      },
+      {
+        "id": "arquitetura-dados",
+        "t": "Arquitetura e fluxo de dados",
+        "d": "13 min",
+        "h": "## Do dado bruto ao dado confiável\n\nUm fluxo analítico transforma dados de origem em informação útil. Em uma plataforma Lakehouse, é comum organizar as etapas em camadas para separar ingestão, limpeza e disponibilização.\n\nO padrão Medallion usa três camadas conceituais:\n\n- **Bronze:** dados ingeridos com pouca transformação, preservando a origem.\n- **Silver:** dados limpos, tipados, deduplicados e integrados.\n- **Gold:** dados agregados ou modelados para consumo analítico e de negócio.\n\n## Responsabilidade de cada camada\n\nA camada Bronze ajuda a reprocessar dados e auditar a ingestão. Silver concentra regras de qualidade, padronização e integração. Gold oferece estruturas orientadas a indicadores, relatórios e aplicações.\n\nNem todo projeto precisa de exatamente três camadas físicas. O padrão é uma forma de organizar responsabilidades; adapte-o ao domínio, ao volume e aos requisitos.\n\n## Exemplo de fluxo\n\n```python\nbronze = spark.read.format(\"delta\").table(\"raw.vendas\")\nsilver = bronze.dropDuplicates([\"id_venda\"]).filter(\"valor >= 0\")\nsilver.write.format(\"delta\").mode(\"overwrite\").saveAsTable(\"trusted.vendas\")\n```\n\nEm produção, valide a estratégia de escrita, particionamento, histórico e reprocessamento antes de usar `overwrite`. Prefira operações incrementais quando o cenário exigir atualização contínua.",
+        "q": [
+          {
+            "p": "Qual é a principal finalidade da camada Bronze?",
+            "o": [
+              "Preservar dados ingeridos próximos da origem para rastreabilidade e reprocessamento.",
+              "Armazenar apenas indicadores finais para dashboards.",
+              "Conter exclusivamente dados já agregados por mês.",
+              "Substituir o catálogo de governança."
+            ],
+            "a": 0,
+            "e": "Bronze preserva a ingestão original e facilita auditoria e reprocessamento."
+          },
+          {
+            "p": "Em qual camada normalmente são aplicadas padronização e deduplicação?",
+            "o": [
+              "Silver.",
+              "Gold exclusivamente.",
+              "Workspace.",
+              "Compute."
+            ],
+            "a": 0,
+            "e": "Silver concentra limpeza, padronização, tipagem e integração."
+          },
+          {
+            "p": "Qual camada costuma servir indicadores e análises de negócio?",
+            "o": [
+              "Gold.",
+              "Bronze.",
+              "Diretório de checkpoint.",
+              "Log do cluster."
+            ],
+            "a": 0,
+            "e": "Gold reúne dados modelados ou agregados para consumo analítico."
+          }
+        ],
+        "studyCards": [
+          {
+            "title": "Camadas Medallion",
+            "concept": "Bronze preserva; Silver qualifica; Gold serve ao consumo.",
+            "explanation": "A separação torna mais claras as responsabilidades de ingestão, qualidade e modelagem analítica. Ela também facilita investigar em qual etapa surgiu um problema.",
+            "example": "Bronze: eventos originais → Silver: eventos deduplicados → Gold: vendas por categoria e mês."
+          },
+          {
+            "title": "Qualidade em cada etapa",
+            "concept": "Regras de qualidade precisam ser explícitas e monitoradas.",
+            "explanation": "Valide campos obrigatórios, tipos, faixas aceitáveis, duplicidades e reconciliação de volumes. Registre rejeições para investigação, em vez de descartá-las silenciosamente.",
+            "example": "assert silver.filter(\"id_venda IS NULL\").count() == 0"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "t": "Delta Lake e SQL",
+    "l": [
+      {
+        "id": "delta-lake",
+        "t": "Tabelas Delta e transações",
+        "d": "14 min",
+        "h": "## Como uma tabela Delta funciona\n\nDelta Lake é uma camada de armazenamento de tabelas que combina arquivos de dados, geralmente Parquet, com um log transacional. O log registra operações e metadados necessários para que leitores vejam uma versão consistente da tabela.\n\nEsse mecanismo dá suporte a transações ACID, histórico de versões, evolução de esquema e controle de concorrência. Os recursos disponíveis e as configurações recomendadas dependem da versão e do ambiente Databricks.\n\n## Operações de leitura e escrita\n\nÉ possível ler uma tabela Delta com Spark ou consultá-la com SQL. Ao escrever, escolha conscientemente entre append, overwrite e operações de atualização. `overwrite` substitui dados conforme o escopo configurado e pode causar perda se usado sem cuidado.\n\n```python\ndf = spark.read.format(\"delta\").load(\"/lake/vendas\")\ndf.write.format(\"delta\").mode(\"append\").saveAsTable(\"comercial.silver.vendas\")\n```\n\n## Histórico e recuperação\n\nO histórico permite inspecionar versões anteriores e apoiar auditoria ou recuperação. A retenção de arquivos e metadados precisa ser planejada: não presuma que uma versão antiga ficará disponível indefinidamente.\n\n## Quando usar Delta\n\nDelta é indicado para tabelas analíticas que precisam de escrita confiável, leituras consistentes e evolução controlada. Defina também chaves de negócio, regras de qualidade e política de retenção.",
+        "q": [
+          {
+            "p": "Qual componente registra as transações de uma tabela Delta?",
+            "o": [
+              "O transaction log da tabela.",
+              "O histórico do navegador.",
+              "O arquivo de configuração do tema.",
+              "A memória do driver, sem persistência."
+            ],
+            "a": 0,
+            "e": "O transaction log registra as operações e metadados que definem as versões da tabela."
+          },
+          {
+            "p": "Qual modo de escrita adiciona novos registros sem substituir os existentes?",
+            "o": [
+              "append.",
+              "overwrite.",
+              "ignore sempre.",
+              "drop."
+            ],
+            "a": 0,
+            "e": "append adiciona dados à tabela. É importante validar duplicidades e idempotência do processo."
+          },
+          {
+            "p": "Por que usar overwrite exige cuidado?",
+            "o": [
+              "Porque pode substituir dados existentes conforme o escopo da escrita.",
+              "Porque sempre transforma a tabela em CSV.",
+              "Porque remove automaticamente todas as permissões.",
+              "Porque desativa o log transacional."
+            ],
+            "a": 0,
+            "e": "Uma sobrescrita mal configurada pode apagar dados que deveriam ser preservados."
+          }
+        ],
+        "studyCards": [
+          {
+            "title": "Transaction log",
+            "concept": "O log Delta registra alterações e define versões consistentes da tabela.",
+            "explanation": "O log é a base dos recursos transacionais. Ele permite que leitores identifiquem quais arquivos pertencem a uma versão e acompanhem alterações realizadas.",
+            "example": "DESCRIBE HISTORY comercial.silver.vendas;"
+          },
+          {
+            "title": "Append x Overwrite",
+            "concept": "Append acrescenta; overwrite substitui o escopo configurado.",
+            "explanation": "Escolha o modo conforme a semântica da carga. Em pipelines repetíveis, avalie merge ou estratégias incrementais para evitar duplicação e perda de dados.",
+            "example": "df.write.format(\"delta\").mode(\"append\").saveAsTable(\"comercial.silver.vendas\")"
+          }
+        ]
+      },
+      {
+        "id": "spark-sql",
+        "t": "Consultas com Spark SQL",
+        "d": "13 min",
+        "h": "## Consultar dados com SQL\n\nSpark SQL permite consultar tabelas e views usando uma linguagem familiar para análise. Em Databricks, as consultas podem ser executadas em notebooks, no SQL editor e em tarefas automatizadas.\n\nUma referência de tabela no Unity Catalog normalmente usa três partes: `catalogo.esquema.tabela`. Essa forma deixa explícita a localização lógica do objeto.\n\n## Estrutura de uma consulta\n\n```sql\nSELECT categoria, SUM(valor) AS total_vendas\nFROM comercial.gold.vendas\nWHERE data_venda >= DATE '2026-01-01'\nGROUP BY categoria\nORDER BY total_vendas DESC;\n```\n\n`SELECT` define as colunas ou expressões retornadas; `FROM` indica a origem; `WHERE` filtra linhas; `GROUP BY` agrega; `ORDER BY` ordena o resultado.\n\n## Joins e agregações\n\nUse joins para combinar tabelas relacionadas. Antes de combinar, entenda a cardinalidade das chaves: uma relação um-para-muitos pode multiplicar linhas e alterar somas. Confira contagens e valores antes e depois do join.\n\n## Consultas eficientes\n\nEvite `SELECT *` em tabelas largas quando só algumas colunas são necessárias. Filtre o quanto antes, verifique o plano de execução e use estatísticas e particionamento quando fizer sentido. Otimização deve ser orientada por métricas, não apenas por regras genéricas.",
+        "q": [
+          {
+            "p": "Qual cláusula filtra linhas antes da agregação?",
+            "o": [
+              "WHERE.",
+              "ORDER BY.",
+              "AS.",
+              "LIMIT BY."
+            ],
+            "a": 0,
+            "e": "WHERE aplica condições às linhas antes do agrupamento."
+          },
+          {
+            "p": "Qual cláusula reúne registros para calcular agregações por categoria?",
+            "o": [
+              "GROUP BY.",
+              "ORDER BY.",
+              "FROM.",
+              "DISTINCT ON."
+            ],
+            "a": 0,
+            "e": "GROUP BY agrupa linhas com valores correspondentes para funções como SUM e COUNT."
+          },
+          {
+            "p": "O que deve ser verificado antes de combinar duas tabelas com JOIN?",
+            "o": [
+              "A cardinalidade e a unicidade das chaves de relacionamento.",
+              "A cor do tema do notebook.",
+              "A ordem alfabética dos nomes dos arquivos.",
+              "A quantidade de células no notebook."
+            ],
+            "a": 0,
+            "e": "A cardinalidade determina quantas linhas podem resultar do join e pode multiplicar registros."
+          }
+        ],
+        "studyCards": [
+          {
+            "title": "Anatomia de uma consulta",
+            "concept": "SELECT escolhe; FROM origina; WHERE filtra; GROUP BY agrega; ORDER BY ordena.",
+            "explanation": "Entender a função de cada cláusula ajuda a construir consultas legíveis e a localizar erros de lógica ou de agregação.",
+            "example": "SELECT categoria, COUNT(*) FROM vendas WHERE valor > 0 GROUP BY categoria;"
+          },
+          {
+            "title": "JOIN sem surpresas",
+            "concept": "A cardinalidade do relacionamento influencia o número de linhas do resultado.",
+            "explanation": "Verifique se a chave é única na dimensão e se há registros sem correspondência. Compare contagens e totais antes e depois da combinação.",
+            "example": "SELECT v.id_venda, c.segmento FROM vendas v LEFT JOIN clientes c ON v.id_cliente = c.id_cliente;"
+          }
+        ]
+      },
+      {
+        "id": "transacoes-delta",
+        "t": "MERGE, evolução de esquema e histórico",
+        "d": "12 min",
+        "h": "## Atualizações incrementais\n\nPipelines de dados frequentemente recebem registros novos e alterações de registros existentes. O comando `MERGE INTO` permite combinar uma origem com uma tabela de destino usando uma condição de correspondência.\n\n```sql\nMERGE INTO comercial.silver.clientes AS destino\nUSING atualizacao_clientes AS origem\nON destino.id_cliente = origem.id_cliente\nWHEN MATCHED THEN UPDATE SET *\nWHEN NOT MATCHED THEN INSERT *;\n```\n\nA condição `ON` deve refletir a chave de negócio. Se a origem tiver várias linhas para a mesma chave, a operação pode ser ambígua; deduplique ou defina uma regra antes do merge.\n\n## Evolução de esquema\n\nEvolução de esquema permite adaptar a estrutura da tabela quando novas colunas ou mudanças são esperadas. Habilite esse comportamento de forma consciente e documente contratos de dados. Aceitar qualquer alteração automaticamente pode esconder incompatibilidades entre produtores e consumidores.\n\n## Histórico de versões\n\nO histórico Delta ajuda a entender operações realizadas e versões disponíveis. Use-o para auditoria e investigação. A recuperação de versões depende das políticas de retenção e da disponibilidade dos arquivos correspondentes.\n\n## Boas práticas\n\n- Defina uma chave estável para identificar registros.\n- Torne a ingestão idempotente sempre que possível.\n- Registre contagens de inserções, atualizações e rejeições.\n- Teste alterações de esquema em ambiente controlado.",
+        "q": [
+          {
+            "p": "Para que serve o comando MERGE INTO em Delta Lake?",
+            "o": [
+              "Aplicar inserções e atualizações com base em uma condição de correspondência.",
+              "Criar um notebook automaticamente.",
+              "Excluir o transaction log.",
+              "Converter SQL em Python sem executar consulta."
+            ],
+            "a": 0,
+            "e": "MERGE combina registros da origem com o destino, permitindo atualizar correspondências e inserir novos registros."
+          },
+          {
+            "p": "O que deve ser garantido na origem antes de um MERGE por chave?",
+            "o": [
+              "Que não existam múltiplas linhas conflitantes para a mesma chave, ou que haja regra explícita para resolvê-las.",
+              "Que todas as colunas tenham nomes com uma letra.",
+              "Que a tabela de destino esteja vazia.",
+              "Que o notebook esteja em modo escuro."
+            ],
+            "a": 0,
+            "e": "Duplicidades na origem podem tornar a correspondência ambígua e causar falhas ou resultados incorretos."
+          },
+          {
+            "p": "Qual é um risco de permitir evolução de esquema sem governança?",
+            "o": [
+              "Mudanças incompatíveis podem chegar aos consumidores sem validação.",
+              "A tabela deixa de armazenar dados em arquivos.",
+              "Todas as consultas passam a ser executadas no navegador.",
+              "O compute perde acesso à rede."
+            ],
+            "a": 0,
+            "e": "Contratos de dados e validações evitam que alterações inesperadas quebrem consumidores."
+          }
+        ],
+        "studyCards": [
+          {
+            "title": "MERGE para cargas incrementais",
+            "concept": "Uma chave e uma regra clara determinam se o registro será atualizado ou inserido.",
+            "explanation": "MERGE é útil para sincronizar dimensões e tabelas que recebem atualizações. Deduplicar a origem e validar a chave são passos importantes antes da operação.",
+            "example": "WHEN MATCHED THEN UPDATE SET destino.nome = origem.nome WHEN NOT MATCHED THEN INSERT (id, nome) VALUES (origem.id, origem.nome)"
+          },
+          {
+            "title": "Contrato de esquema",
+            "concept": "Evolução de esquema precisa ser planejada e comunicada.",
+            "explanation": "Novas colunas, mudanças de tipo e remoções afetam consumidores. Versione contratos e teste compatibilidade antes de publicar alterações.",
+            "example": "Antes de adicionar uma coluna obrigatória, defina valor padrão, backfill e compatibilidade dos leitores."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "t": "Engenharia de dados",
+    "l": [
+      {
+        "id": "pyspark",
+        "t": "Transformações com PySpark",
+        "d": "14 min",
+        "h": "## DataFrames distribuídos\n\nPySpark é a interface Python para trabalhar com Apache Spark. Um DataFrame representa dados distribuídos em linhas e colunas e permite expressar transformações sem gerenciar manualmente cada partição.\n\nAs transformações mais comuns incluem `select`, `filter`, `withColumn`, `groupBy` e `join`. Em geral, essas operações retornam novos DataFrames, em vez de alterar o objeto original.\n\n```python\nfrom pyspark.sql import functions as F\n\nvendas = spark.table(\"comercial.silver.vendas\")\nresultado = (\n    vendas.filter(F.col(\"valor\") > 0)\n          .groupBy(\"categoria\")\n          .agg(F.sum(\"valor\").alias(\"total\"))\n)\ndisplay(resultado)\n```\n\n## Avaliação preguiçosa\n\nO Spark costuma construir um plano lógico quando você encadeia transformações. A execução ocorre quando uma ação, como `count`, `show`, `collect` ou `write`, precisa produzir um resultado.\n\nEvite `collect()` em conjuntos grandes: ele traz os dados para o processo driver e pode consumir memória excessiva. Prefira agregações distribuídas e amostras limitadas para inspeção.\n\n## Joins e particionamento\n\nJoins podem exigir movimentação de dados entre partições. Conheça o tamanho das tabelas, a distribuição das chaves e o plano de execução. Broadcast join pode ajudar quando uma das tabelas é pequena, mas deve ser usado com critério.\n\n## Código legível e reutilizável\n\nSepare transformações em etapas nomeadas, use funções de `pyspark.sql.functions` e evite UDFs quando operações nativas resolvem o problema. Funções nativas costumam permitir mais otimizações pelo Catalyst.",
+        "q": [
+          {
+            "p": "Qual das opções é uma ação que normalmente dispara a execução de um DataFrame?",
+            "o": [
+              "df.count().",
+              "df.select(\"categoria\").",
+              "df.filter(\"valor > 0\").",
+              "df.withColumn(\"ano\", F.year(\"data\"))."
+            ],
+            "a": 0,
+            "e": "count é uma ação. select, filter e withColumn são transformações que compõem o plano."
+          },
+          {
+            "p": "Por que collect() deve ser usado com cuidado em grandes DataFrames?",
+            "o": [
+              "Porque traz os registros para a memória do driver.",
+              "Porque remove as colunas do DataFrame.",
+              "Porque transforma automaticamente dados em CSV.",
+              "Porque desativa o processamento distribuído de forma permanente."
+            ],
+            "a": 0,
+            "e": "collect transfere os resultados para o driver e pode causar falta de memória."
+          },
+          {
+            "p": "Qual prática costuma favorecer a otimização de consultas PySpark?",
+            "o": [
+              "Preferir funções nativas do Spark quando atendem à transformação.",
+              "Converter todo DataFrame para lista Python no início.",
+              "Aplicar collect após cada transformação.",
+              "Criar uma UDF para qualquer operação simples."
+            ],
+            "a": 0,
+            "e": "Funções nativas são conhecidas pelo otimizador e evitam transferências desnecessárias para Python."
+          }
+        ],
+        "studyCards": [
+          {
+            "title": "Transformação x ação",
+            "concept": "Transformações montam o plano; ações solicitam a execução.",
+            "explanation": "select, filter e groupBy descrevem operações. count, show e write acionam o processamento para produzir ou persistir resultados.",
+            "example": "filtrado = df.filter(F.col(\"valor\") > 0)  # transformação\\nfiltrado.count()  # ação"
+          },
+          {
+            "title": "Evite collect em grandes volumes",
+            "concept": "Mantenha o processamento distribuído sempre que possível.",
+            "explanation": "collect traz todos os registros ao driver. Para inspecionar dados, use limit, show ou agregações que reduzam o volume transferido.",
+            "example": "df.select(\"categoria\").distinct().show(20)"
+          }
+        ]
+      },
+      {
+        "id": "autoloader",
+        "t": "Ingestão incremental com Auto Loader",
+        "d": "13 min",
+        "h": "## O que é Auto Loader\n\nAuto Loader é um recurso do Databricks para detectar e ingerir arquivos novos de forma incremental a partir do armazenamento em nuvem. Ele é útil quando sistemas de origem publicam arquivos continuamente e o pipeline precisa processar somente o que chegou.\n\nA leitura costuma ser feita com `cloudFiles`, informando o formato dos arquivos, o caminho de origem e diretórios de checkpoint e schema.\n\n```python\nentrada = (\n    spark.readStream.format(\"cloudFiles\")\n      .option(\"cloudFiles.format\", \"json\")\n      .option(\"cloudFiles.schemaLocation\", \"/checkpoints/vendas/schema\")\n      .load(\"/landing/vendas\")\n)\n```\n\n## Checkpoint e estado\n\nO checkpoint guarda informações necessárias para retomar o processamento e evitar reprocessamento indevido. Deve ficar em um caminho persistente e exclusivo para a consulta. Não apague o checkpoint sem entender o impacto no estado do pipeline.\n\n## Evolução de esquema\n\nFontes podem adicionar campos ao longo do tempo. Configure o modo de evolução conforme o contrato esperado e monitore colunas inesperadas. Dados incompatíveis devem ser encaminhados para tratamento, não ignorados silenciosamente.\n\n## Operação confiável\n\nUse `writeStream` com destino Delta, defina `checkpointLocation`, acompanhe atrasos e falhas e planeje reprocessamento. Teste a recuperação após interrupções e valide se os dados foram ingeridos exatamente conforme a regra do negócio.",
+        "q": [
+          {
+            "p": "Qual é o principal objetivo do Auto Loader?",
+            "o": [
+              "Detectar e ingerir arquivos novos de forma incremental.",
+              "Executar consultas SQL apenas em memória.",
+              "Criar automaticamente permissões de usuários.",
+              "Substituir todos os notebooks por dashboards."
+            ],
+            "a": 0,
+            "e": "Auto Loader automatiza a descoberta e a ingestão incremental de arquivos em armazenamento de nuvem."
+          },
+          {
+            "p": "Qual é a função do checkpoint em um fluxo de ingestão?",
+            "o": [
+              "Persistir estado e permitir retomada do processamento.",
+              "Armazenar a senha do usuário em texto puro.",
+              "Substituir a tabela Delta de destino.",
+              "Guardar somente os gráficos do notebook."
+            ],
+            "a": 0,
+            "e": "O checkpoint mantém o estado da consulta e apoia a recuperação após falhas."
+          },
+          {
+            "p": "Onde deve ficar o checkpoint de um pipeline de produção?",
+            "o": [
+              "Em um caminho persistente, controlado e exclusivo para a consulta.",
+              "Em uma pasta temporária apagada a cada execução.",
+              "Na pasta de downloads do navegador.",
+              "Dentro de uma célula Markdown do notebook."
+            ],
+            "a": 0,
+            "e": "O checkpoint precisa sobreviver a reinicializações e não deve ser compartilhado indevidamente entre consultas."
+          }
+        ],
+        "studyCards": [
+          {
+            "title": "cloudFiles",
+            "concept": "Auto Loader usa cloudFiles para descobrir arquivos novos e ingerir dados incrementalmente.",
+            "explanation": "A configuração define formato, origem, local de schema e estado. O pipeline pode então processar arquivos conforme chegam ao storage.",
+            "example": "spark.readStream.format(\"cloudFiles\").option(\"cloudFiles.format\", \"json\").load(\"/landing/eventos\")"
+          },
+          {
+            "title": "Checkpoint é parte do pipeline",
+            "concept": "Sem checkpoint persistente, a recuperação e a continuidade ficam comprometidas.",
+            "explanation": "Mantenha o caminho protegido, persistente e específico para a consulta. Mudanças no checkpoint devem fazer parte de um procedimento de operação documentado.",
+            "example": ".option(\"checkpointLocation\", \"/checkpoints/vendas\")"
+          }
+        ]
+      },
+      {
+        "id": "pipelines-etl",
+        "t": "Pipelines ETL e qualidade de dados",
+        "d": "15 min",
+        "h": "## ETL e ELT\n\nETL significa extrair, transformar e carregar. ELT carrega os dados primeiro em uma plataforma de destino e transforma depois, aproveitando a capacidade de processamento do ambiente analítico. A escolha depende da origem, do destino, da governança e dos requisitos de latência.\n\nEm ambos os casos, um pipeline confiável precisa controlar entradas, transformações, saídas e falhas. A transformação não deve ser apenas um conjunto de comandos: ela representa regras de negócio que precisam ser testadas.\n\n## Qualidade de dados\n\nValide campos obrigatórios, tipos, valores permitidos, unicidade e relacionamentos. Separe registros inválidos para investigação e acompanhe métricas como volume recebido, rejeições e atraso de processamento.\n\n```python\nfrom pyspark.sql import functions as F\n\nvalidos = df.filter(\n    F.col(\"id_venda\").isNotNull() &\n    (F.col(\"valor\") >= 0)\n)\ninvalidos = df.subtract(validos)\n```\n\nO exemplo é ilustrativo: em pipelines de grande volume, prefira expressar regras de qualidade em uma única passagem e evite recalcular o mesmo conjunto de dados sem necessidade.\n\n## Idempotência e reprocessamento\n\nUma tarefa idempotente pode ser executada novamente sem produzir duplicações ou efeitos colaterais indesejados. Use chaves de negócio, controle de lotes e operações de merge quando apropriado.\n\n## Observabilidade\n\nRegistre duração, volume, contagem de rejeições, última execução bem-sucedida e causa de falhas. Alertas devem apontar um problema acionável, não apenas gerar ruído.",
+        "q": [
+          {
+            "p": "Qual é a diferença geral entre ETL e ELT?",
+            "o": [
+              "ETL transforma antes de carregar; ELT carrega e transforma no destino.",
+              "ETL usa apenas Python e ELT apenas SQL.",
+              "ELT não precisa de dados de origem.",
+              "Não existe diferença de ordem entre as etapas."
+            ],
+            "a": 0,
+            "e": "A distinção principal é a ordem em que transformação e carregamento acontecem."
+          },
+          {
+            "p": "O que significa tornar uma tarefa idempotente?",
+            "o": [
+              "Executá-la novamente sem duplicar ou alterar indevidamente o resultado final.",
+              "Executá-la somente uma vez e apagar o código.",
+              "Impedir qualquer reprocessamento após uma falha.",
+              "Executar a tarefa sem registrar métricas."
+            ],
+            "a": 0,
+            "e": "Idempotência torna reexecuções seguras, algo essencial em recuperação e operação."
+          },
+          {
+            "p": "Qual métrica ajuda a identificar problemas de qualidade na ingestão?",
+            "o": [
+              "Quantidade e proporção de registros rejeitados.",
+              "Número de cores usadas no dashboard.",
+              "Tamanho do nome do notebook.",
+              "Quantidade de abas abertas no navegador."
+            ],
+            "a": 0,
+            "e": "Acompanhar rejeições e volumes permite identificar mudanças inesperadas na origem ou nas regras."
+          }
+        ],
+        "studyCards": [
+          {
+            "title": "ETL e ELT",
+            "concept": "A ordem entre transformação e carregamento muda conforme a arquitetura.",
+            "explanation": "ETL transforma antes do destino; ELT carrega primeiro e transforma usando a plataforma analítica. Ambos exigem validação, rastreabilidade e controle de falhas.",
+            "example": "ELT: arquivos landing → tabelas bronze → transformação silver → agregações gold."
+          },
+          {
+            "title": "Idempotência",
+            "concept": "Reexecutar uma tarefa não deve duplicar o resultado.",
+            "explanation": "Chaves estáveis, identificação de lotes e operações incrementais ajudam a tornar a execução repetível e segura.",
+            "example": "MERGE por id_evento em vez de inserir cegamente o mesmo lote a cada tentativa."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "t": "Governança e operações",
+    "l": [
+      {
+        "id": "unity-catalog",
+        "t": "Governança com Unity Catalog",
+        "d": "14 min",
+        "h": "## Governança centralizada\n\nUnity Catalog oferece governança centralizada para dados e ativos do Databricks. Ele organiza objetos em uma hierarquia lógica e permite administrar permissões, descoberta, linhagem e auditoria de acordo com os recursos habilitados no ambiente.\n\nA referência usual para uma tabela é `catalogo.esquema.tabela`. O metastore é a camada de governança que contém catálogos; cada catálogo contém schemas; schemas organizam tabelas, views, volumes e outros objetos.\n\n## Princípio do menor privilégio\n\nConceda apenas as permissões necessárias para a função de cada pessoa ou grupo. Prefira conceder permissões a grupos gerenciados, em vez de configurar acessos individuais repetidamente.\n\n```sql\nGRANT SELECT ON TABLE comercial.gold.vendas\nTO `analistas`;\n```\n\nRevise concessões periodicamente e remova acessos que deixaram de ser necessários. Permissão de leitura não deve ser confundida com permissão de alteração ou administração.\n\n## Linhagem e auditoria\n\nA linhagem ajuda a entender de onde os dados vieram e quais ativos dependem de uma tabela. Logs e auditoria apoiam investigações, conformidade e análise de incidentes.\n\n## Organização dos objetos\n\nDefina convenções de nomes, separe ambientes quando necessário e documente o propósito de schemas e tabelas. Uma boa organização reduz ambiguidades e facilita a descoberta de dados confiáveis.",
+        "q": [
+          {
+            "p": "Qual é a hierarquia usual para identificar uma tabela no Unity Catalog?",
+            "o": [
+              "catalogo.esquema.tabela.",
+              "tabela.catalogo.esquema.",
+              "workspace.cluster.tabela.",
+              "metastore.usuario.arquivo."
+            ],
+            "a": 0,
+            "e": "A referência de três partes identifica catálogo, schema e objeto."
+          },
+          {
+            "p": "O que recomenda o princípio do menor privilégio?",
+            "o": [
+              "Conceder apenas as permissões necessárias para cada função.",
+              "Conceder acesso de administrador a todos os usuários.",
+              "Compartilhar credenciais para simplificar a operação.",
+              "Manter permissões antigas mesmo quando não são mais necessárias."
+            ],
+            "a": 0,
+            "e": "Menor privilégio reduz exposição e limita o impacto de erros ou uso indevido."
+          },
+          {
+            "p": "Para que serve a linhagem de dados?",
+            "o": [
+              "Entender origem, transformações e dependências entre ativos.",
+              "Alterar automaticamente os valores de todas as tabelas.",
+              "Aumentar a memória do cluster.",
+              "Substituir as regras de acesso."
+            ],
+            "a": 0,
+            "e": "A linhagem ajuda a rastrear dependências e avaliar o impacto de mudanças."
+          }
+        ],
+        "studyCards": [
+          {
+            "title": "Hierarquia do Unity Catalog",
+            "concept": "Metastore → catálogo → schema → tabela ou outro objeto.",
+            "explanation": "A hierarquia organiza os ativos e fornece contexto para permissões e descoberta. Use nomes de três partes para referenciar tabelas quando aplicável.",
+            "example": "comercial.gold.vendas"
+          },
+          {
+            "title": "Menor privilégio",
+            "concept": "Permita somente o necessário, pelo tempo necessário.",
+            "explanation": "Organize acessos por grupos e funções. Revise concessões e evite credenciais compartilhadas ou permissões administrativas sem justificativa.",
+            "example": "GRANT SELECT ON TABLE comercial.gold.vendas TO `analistas`;"
+          }
+        ]
+      },
+      {
+        "id": "workflows",
+        "t": "Workflows e jobs",
+        "d": "13 min",
+        "h": "## Automatizar tarefas\n\nJobs e Workflows permitem agendar e orquestrar tarefas de dados. Um workflow pode conter várias tarefas, dependências, parâmetros e configurações de execução, facilitando a organização de processos que antes eram disparados manualmente.\n\nUma tarefa pode executar notebook, script, consulta SQL ou outro tipo de atividade compatível com o ambiente. Defina dependências explícitas para que etapas ocorram na ordem correta.\n\n## Planejamento de execução\n\nConfigure agenda, parâmetros, compute e política de tentativas de acordo com a criticidade. Uma nova tentativa pode recuperar falhas transitórias, mas não corrige um erro permanente de lógica ou de dados.\n\n## Monitoramento\n\nAcompanhe duração, estado, logs e saída de cada tarefa. Configure notificações para falhas relevantes e mantenha instruções de recuperação. Não envie segredos em parâmetros visíveis ou logs.\n\n## Exemplo de fluxo\n\n1. Ingerir arquivos novos.\n2. Validar schema e qualidade.\n3. Atualizar tabelas Silver.\n4. Publicar agregações Gold.\n5. Notificar consumidores sobre a conclusão.\n\nO workflow deve ser testado com dados vazios, entradas duplicadas, falhas intermediárias e reexecução.",
+        "q": [
+          {
+            "p": "Qual é a principal finalidade de um Workflow?",
+            "o": [
+              "Orquestrar tarefas e suas dependências em um processo automatizado.",
+              "Substituir o Unity Catalog.",
+              "Armazenar arquivos de origem sem processamento.",
+              "Editar o tema visual dos notebooks."
+            ],
+            "a": 0,
+            "e": "Workflows coordenam tarefas, dependências, parâmetros e execução agendada."
+          },
+          {
+            "p": "Por que configurar tentativas automáticas com cuidado?",
+            "o": [
+              "Porque retries ajudam em falhas transitórias, mas não corrigem erros permanentes.",
+              "Porque toda falha deve repetir infinitamente.",
+              "Porque retries substituem testes de qualidade.",
+              "Porque retries removem a necessidade de logs."
+            ],
+            "a": 0,
+            "e": "Tentativas são úteis para falhas temporárias; erros de lógica exigem correção."
+          },
+          {
+            "p": "O que deve ser monitorado em um job de produção?",
+            "o": [
+              "Estado, duração, logs, falhas e métricas relevantes da execução.",
+              "Apenas o nome do notebook.",
+              "Somente o tema escuro ou claro.",
+              "A quantidade de abas do browser."
+            ],
+            "a": 0,
+            "e": "Essas informações ajudam a detectar atrasos, falhas e mudanças de comportamento."
+          }
+        ],
+        "studyCards": [
+          {
+            "title": "Dependências entre tarefas",
+            "concept": "Uma etapa só deve iniciar quando suas pré-condições forem atendidas.",
+            "explanation": "Organize ingestão, validação e publicação em tarefas claras. Isso facilita identificar onde ocorreu uma falha e executar novamente apenas o necessário.",
+            "example": "Ingestão → validação → transformação → publicação → notificação."
+          },
+          {
+            "title": "Retry não é correção",
+            "concept": "Tentativas automáticas tratam falhas transitórias, não defeitos de lógica.",
+            "explanation": "Defina limite de tentativas, intervalos e alertas. Investigue erros recorrentes e evite loops de execução que aumentam custo sem resolver a causa.",
+            "example": "Falha temporária de rede: retry pode ajudar. Coluna obrigatória inexistente: corrija o contrato ou a transformação."
+          }
+        ]
+      },
+      {
+        "id": "seguranca-monitoramento",
+        "t": "Segurança, custos e monitoramento",
+        "d": "14 min",
+        "h": "## Segurança operacional\n\nProteja credenciais usando mecanismos de secrets e identidades gerenciadas disponíveis no ambiente. Evite inserir tokens em notebooks, arquivos versionados, parâmetros abertos ou mensagens de log.\n\nSepare ambientes de desenvolvimento, homologação e produção quando o risco e o processo exigirem. Restrinja permissões, monitore acessos e estabeleça procedimentos para rotação de credenciais.\n\n## Monitoramento de custos\n\nCompute, armazenamento e transferências podem gerar custos diferentes. Acompanhe utilização, duração dos jobs, concorrência e recursos ociosos. Tags e convenções de nomes ajudam a atribuir custos a equipes e produtos.\n\n## Observabilidade de pipelines\n\nUma operação madura acompanha métricas técnicas e de negócio: volume ingerido, atraso, registros rejeitados, duração, falhas e atualização mais recente. Defina limites e alertas com base no comportamento esperado.\n\n## Resposta a incidentes\n\nQuando um pipeline falhar, identifique o ponto da falha, preserve logs, avalie impacto nos consumidores e siga o procedimento de recuperação. Antes de reprocessar, confirme se a operação é idempotente e se não haverá duplicação.\n\n## Checklist de produção\n\n- Segredos fora do código.\n- Permissões revisadas.\n- Alertas acionáveis.\n- Logs sem dados sensíveis.\n- Custos e recursos ociosos acompanhados.\n- Procedimento de rollback e reprocessamento documentado.",
+        "q": [
+          {
+            "p": "Onde devem ser armazenados tokens e credenciais usados por pipelines?",
+            "o": [
+              "Em um mecanismo seguro de secrets ou identidade gerenciada.",
+              "Diretamente no código-fonte público.",
+              "Em células Markdown compartilhadas.",
+              "No nome do cluster."
+            ],
+            "a": 0,
+            "e": "Secrets e identidades gerenciadas reduzem exposição de credenciais."
+          },
+          {
+            "p": "Qual indicador pode revelar atraso em um pipeline de ingestão?",
+            "o": [
+              "Tempo desde a chegada do dado até sua disponibilidade para consumo.",
+              "Quantidade de comentários no notebook.",
+              "Número de cores de um dashboard.",
+              "Comprimento do nome da tabela."
+            ],
+            "a": 0,
+            "e": "Atraso ou freshness mede quanto tempo os dados levam para chegar ao consumidor."
+          },
+          {
+            "p": "O que verificar antes de reprocessar uma tarefa após incidente?",
+            "o": [
+              "Se a execução é idempotente e se a repetição pode duplicar efeitos.",
+              "Se o tema do site está atualizado.",
+              "Se o notebook tem título em caixa alta.",
+              "Se a janela do navegador está maximizada."
+            ],
+            "a": 0,
+            "e": "A análise de idempotência evita duplicações e efeitos colaterais durante a recuperação."
+          }
+        ],
+        "studyCards": [
+          {
+            "title": "Credenciais seguras",
+            "concept": "Segredos não devem ficar embutidos no código ou nos logs.",
+            "explanation": "Use secrets, identidades gerenciadas e políticas de acesso. Restrinja quem pode ler credenciais e planeje sua rotação.",
+            "example": "dbutils.secrets.get(scope=\"producao\", key=\"token-api\")"
+          },
+          {
+            "title": "Sinais de saúde do pipeline",
+            "concept": "Monitore dados, execução e impacto para o consumidor.",
+            "explanation": "Volume, atraso, rejeições, duração e falhas mostram dimensões diferentes da saúde do processo. Defina alertas que levem a uma ação clara.",
+            "example": "freshness > limite esperado → alerta para investigar atraso de ingestão."
+          }
+        ]
+      }
+    ]
+  }
 ];
 
 /* ---------- 4. Validação do conteúdo ---------- */
@@ -191,7 +837,22 @@ const acharAula = (id) => aulas().find((l) => l.id === id) || null;
 const indiceModulo = (aula) => S.mods.findIndex((m) => m.l.includes(aula));
 const moduloDe = (aula) => S.mods[indiceModulo(aula)];
 
+const VERSAO_CURRICULO = "2026-11-20-trilha-ampliada-v1";
+let trilhaRecriada = false;
 function carregarConteudo() {
+  const versao = armazem.bruto(K.curriculo);
+  if (versao !== VERSAO_CURRICULO) {
+    /* Substitui a trilha anterior uma única vez pela nova estrutura.
+       Preferências, temas, chaves de API e backups salvos são preservados. */
+    S.mods = clone(CONTEUDO_PADRAO);
+    armazem.gravar(K.conteudo, S.mods);
+    armazem.gravar(K.curriculo, VERSAO_CURRICULO);
+    armazem.apagar(K.progresso);
+    armazem.apagar(K.stats);
+    armazem.apagar(K.marcas);
+    trilhaRecriada = true;
+    return;
+  }
   const salvo = armazem.ler(K.conteudo, null);
   S.mods = conteudoValido(salvo) ? salvo : clone(CONTEUDO_PADRAO);
 }
@@ -928,10 +1589,25 @@ function telaAula(l) {
   const todas = aulas(); const i = todas.indexOf(l); const mi = indiceModulo(l);
   const ant = todas[i - 1], prox = todas[i + 1];
   const feitas = (S.progresso[l.id] || []).length;
-  const corpo = paragrafos(l.h).map((p, pi) => {
-    const id = l.id + ":line:" + pi;
-    return '<p class="marcavel" data-marca-id="' + esc(id) + '" data-marcado="' + !!S.marcas.lines[id] + '">' + botaoMarcar(id, "este parágrafo") + esc(p).replace(/\n/g, "<br>") + "</p>";
-  }).join("");
+  const textoAula = String(l.h || "").trim();
+  const temMarkdown = /(^|\n)\s{0,3}(#{1,6}\s|[-*•]\s|\d+[.)]\s)|\*\*[^*]+\*\*|`[^`]+`|```/m.test(textoAula);
+  let corpo;
+  if (temMarkdown) {
+    /* Conteúdo criado pelo Datrics é Markdown. Renderize-o com o mesmo
+       processador seguro usado nas respostas do tutor, em vez de exibir
+       literalmente ##, ** e listas. Mantém a ação de marcar parágrafos. */
+    let indiceParagrafo = 0;
+    corpo = md(textoAula).replace(/<p>/g, () => {
+      const pi = indiceParagrafo++;
+      const id = l.id + ":line:" + pi;
+      return '<p class="marcavel" data-marca-id="' + esc(id) + '" data-marcado="' + !!S.marcas.lines[id] + '">' + botaoMarcar(id, "este parágrafo");
+    });
+  } else {
+    corpo = paragrafos(textoAula).map((p, pi) => {
+      const id = l.id + ":line:" + pi;
+      return '<p class="marcavel" data-marca-id="' + esc(id) + '" data-marcado="' + !!S.marcas.lines[id] + '">' + botaoMarcar(id, "este parágrafo") + esc(p).replace(/\n/g, "<br>") + "</p>";
+    }).join("");
+  }
   const cards = Array.isArray(l.studyCards) && l.studyCards.length ? '<section aria-label="Estude antes de praticar"><p class="olho">Estude antes de praticar</p>' + l.studyCards.map((c, ci) => {
     const id = l.id + ":card:" + ci;
     return '<div class="cartao marcavel" data-marca-id="' + esc(id) + '" data-marcado="' + !!S.marcas.lines[id] + '">' + botaoMarcar(id, "este card") +
@@ -1966,6 +2642,7 @@ function iniciar() {
   App.ia?.iniciar?.();
   addEventListener("hashchange", render);
   render();
+  if (trilhaRecriada) aviso("A trilha foi recriada com 4 módulos, 12 aulas, cards e novas questões. O progresso da trilha anterior foi reiniciado; temas, configurações e backups foram preservados.");
 }
 
 Object.assign(App, {

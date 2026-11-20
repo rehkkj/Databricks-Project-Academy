@@ -345,6 +345,19 @@ dialog[open] { animation: sobe var(--t-media) var(--curva); }
 dialog::backdrop { background: oklch(0.2 0.02 60 / 0.4); backdrop-filter: blur(2px); }
 .dlg-cab { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--regua); position: sticky; top: 0; background: var(--folha); z-index: 1; }
 .dlg-cab h2 { font-size: 1.3rem; margin: 0; }
+.dlg-cab [data-fechar] {
+  width: 44px; height: 44px; min-width: 44px; flex: 0 0 44px;
+  display: grid; place-items: center; border: 1px solid var(--regua);
+  border-radius: 12px; background: var(--folha-2); color: var(--tinta);
+  font-size: 1.45rem; line-height: 1; font-weight: 500; cursor: pointer;
+  touch-action: manipulation; transition: background-color 180ms ease, border-color 180ms ease, transform 180ms ease;
+}
+.dlg-cab [data-fechar]:hover { background: var(--brasa-fundo); border-color: var(--brasa); transform: scale(1.04); }
+.dlg-cab [data-fechar]:focus-visible { outline: 3px solid var(--brasa); outline-offset: 3px; }
+@media (max-width: 520px) {
+  .dlg-cab { padding: 10px 12px 10px 16px; gap: 10px; }
+  .dlg-cab [data-fechar] { width: 46px; height: 46px; min-width: 46px; flex-basis: 46px; }
+}
 .dlg-corpo { padding: 20px; overflow: auto; }
 .dlg-pe { padding: 14px 20px; border-top: 1px solid var(--regua); display: flex; justify-content: flex-end; gap: 8px; }
 dialog.largo { width: min(980px, calc(100vw - 24px)); }
@@ -368,10 +381,19 @@ dialog.largo { width: min(980px, calc(100vw - 24px)); }
   border-radius: calc(var(--raio) + 4px); box-shadow: var(--sombra-flutua);
   transform-origin: bottom right; animation: abre-canto var(--t-media) var(--curva);
 }
-.datrics-cab { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--regua); cursor: move; user-select: none; touch-action: none; }
-.datrics-cab strong { font: italic 500 1.1rem var(--f-titulo); }
-.datrics-cab .mini { color: var(--tinta-3); }
-.datrics-cab .linha-btns { margin-left: auto; gap: 2px; }
+.datrics-cab { display: flex; flex-wrap: nowrap; align-items: center; gap: 10px; min-height: 64px; padding: 8px 12px; border-bottom: 1px solid var(--regua); cursor: move; user-select: none; touch-action: none; }
+.datrics-cab strong { flex: 0 0 auto; font: italic 500 1.1rem var(--f-titulo); }
+.datrics-cab > .mini { flex: 1 1 90px; min-width: 0; max-width: 150px; color: var(--tinta-3); line-height: 1.35; overflow-wrap: anywhere; }
+.datrics-cab > .linha-btns { flex: 0 0 auto; display: flex; flex-wrap: nowrap; align-items: center; margin-left: auto; gap: 4px; white-space: nowrap; }
+.datrics-cab > .linha-btns .btn { flex: 0 0 auto; white-space: nowrap; }
+.datrics-cab [data-dt="fechar"] {
+  display: grid; place-items: center; flex: 0 0 44px; width: 44px; height: 44px;
+  min-width: 44px; padding: 0; border: 1px solid var(--regua); border-radius: 12px;
+  background: var(--folha-2); color: var(--tinta); font-size: 1.35rem; line-height: 1;
+  touch-action: manipulation; cursor: pointer; transition: background-color 180ms ease, border-color 180ms ease, transform 180ms ease;
+}
+.datrics-cab [data-dt="fechar"]:hover { background: var(--brasa-fundo); border-color: var(--brasa); transform: scale(1.04); }
+.datrics-cab [data-dt="fechar"]:focus-visible { outline: 3px solid var(--brasa); outline-offset: 3px; }
 .datrics-opcoes { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--regua); font-size: 0.8rem; }
 .datrics-opcoes select { width: auto; padding: 4px 8px; font-size: 0.8rem; }
 .datrics-opcoes .check { margin: 0; font-size: 0.8rem; }
@@ -489,6 +511,10 @@ dialog.largo { width: min(980px, calc(100vw - 24px)); }
   .perfil-nome, .nivel-rotulo { display: none; }
   .nivel button { padding: 4px 7px; }
   .datrics { inset: auto 0 0 0 !important; width: 100% !important; height: 85vh !important; border-radius: 14px 14px 0 0; resize: none; min-width: 0; }
+  .datrics-cab { gap: 8px; min-height: 62px; padding: 8px 10px; }
+  .datrics-cab > .mini { max-width: 112px; font-size: 0.72rem; }
+  .datrics-cab > .linha-btns { gap: 2px; }
+  .datrics-cab [data-dt="fechar"] { flex-basis: 46px; width: 46px; height: 46px; min-width: 46px; }
   .grade-2, .grade-3, .lab { grid-template-columns: minmax(0, 1fr); }
   .placar dl { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .marcar-btn { right: auto; left: -4px; top: -22px; opacity: 0.5; }
@@ -653,3 +679,13 @@ output { color: var(--tinta-3); font-size: 0.78rem; }
 .tema-import-item input { accent-color: var(--brasa); }
 .tema-import-item span { display: grid; gap: 2px; }
 .tema-import-item small { color: var(--tinta-2); font-size: .78rem; }
+
+/* Conteúdo Markdown gerado pelo Datrics segue a tipografia da aula nativa. */
+.aula-corpo .md { color: var(--tinta); line-height: 1.8; }
+.aula-corpo .md h3 { margin: 1.8rem 0 .7rem; font-family: var(--fonte-titulo, Georgia, serif); font-size: clamp(1.25rem, 2.2vw, 1.65rem); line-height: 1.25; font-weight: 500; }
+.aula-corpo .md p { margin: 0 0 1rem; }
+.aula-corpo .md ul, .aula-corpo .md ol { margin: .4rem 0 1.2rem; padding-left: 1.5rem; }
+.aula-corpo .md li { margin: .35rem 0; padding-left: .2rem; }
+.aula-corpo .md code { padding: .12em .35em; border-radius: .3rem; background: var(--superficie-2, rgba(127,127,127,.14)); }
+.aula-corpo .md pre { overflow-x: auto; margin: 1rem 0 1.4rem; padding: 1rem; border: 1px solid var(--borda); border-radius: var(--raio); background: var(--superficie-2); }
+.aula-corpo .md pre code { padding: 0; background: transparent; }
