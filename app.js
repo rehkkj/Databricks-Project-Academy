@@ -1743,18 +1743,29 @@ const editor = (() => {
 
 /* ---------- 21. Menus do topo ---------- */
 function menuPop(botao, itens) {
-  const aberto = $(".menu-pop", botao.parentElement);
-  if (aberto) { aberto.remove(); botao.setAttribute("aria-expanded", "false"); return; }
-  const m = document.createElement("div"); m.className = "menu-pop"; m.setAttribute("role", "menu");
+  const existente = document.getElementById("menuIAFlutuante");
+  if (existente) { existente.remove(); $$('[data-abrir-ia]').forEach((b) => b.setAttribute("aria-expanded", "false")); return; }
+  const m = document.createElement("div"); m.id = "menuIAFlutuante"; m.className = "menu-pop menu-pop-portal"; m.setAttribute("role", "menu");
   m.innerHTML = itens.map((it, i) => '<button type="button" role="menuitem" data-item="' + i + '">' + esc(it.texto) + (it.dica ? "<small>" + esc(it.dica) + "</small>" : "") + "</button>").join("");
-  botao.parentElement.appendChild(m); botao.setAttribute("aria-expanded", "true");
-  if (botao.getBoundingClientRect().left > innerWidth / 2) m.style.right = "0";
-  m.querySelector("button")?.focus();
-  const fechar = (e) => { if (e && (m.contains(e.target) && !e.target.closest("[data-item]") || e.target === botao || botao.contains(e.target))) return; m.remove(); botao.setAttribute("aria-expanded", "false"); document.removeEventListener("click", fechar, true); document.removeEventListener("keydown", tecla); };
+  document.body.appendChild(m);
+  const posicionar = () => {
+    const r = botao.getBoundingClientRect(), w = Math.max(220, m.offsetWidth || 220);
+    const left = Math.max(8, Math.min(r.left, innerWidth - w - 8));
+    m.style.left = left + "px"; m.style.top = Math.min(innerHeight - m.offsetHeight - 8, r.bottom + 7) + "px";
+  };
+  $$('[data-abrir-ia]').forEach((b) => b.setAttribute("aria-expanded", String(b === botao)));
+  posicionar(); m.querySelector("button")?.focus();
+  const fechar = (e) => {
+    if (e && (m.contains(e.target) || e.target === botao || botao.contains(e.target))) return;
+    m.remove(); $$('[data-abrir-ia]').forEach((b) => b.setAttribute("aria-expanded", "false"));
+    document.removeEventListener("click", fechar, true); document.removeEventListener("keydown", tecla);
+    removeEventListener("resize", posicionar); removeEventListener("scroll", posicionar, true);
+  };
   const tecla = (e) => { if (e.key === "Escape") { fechar(); botao.focus(); } };
-  m.onclick = (e) => { const b = e.target.closest("[data-item]"); if (b) { itens[+b.dataset.item].acao(); fechar(); } };
-  setTimeout(() => { document.addEventListener("click", fechar, true); document.addEventListener("keydown", tecla); });
+  m.onclick = (e) => { const b = e.target.closest("[data-item]"); if (b) { const acao = itens[+b.dataset.item].acao; fechar(); acao(); } };
+  setTimeout(() => { document.addEventListener("click", fechar, true); document.addEventListener("keydown", tecla); addEventListener("resize", posicionar); addEventListener("scroll", posicionar, true); });
 }
+
 const itensIA = () => [
   { texto: "Tirar uma dúvida", dica: "Abre o Datrics com o contexto desta tela", acao: () => App.ia?.abrirChat() },
   { texto: "Criar questões", dica: "Gerador, chaves de API e backup criptografado", acao: () => App.ia?.abrirGerador() },
