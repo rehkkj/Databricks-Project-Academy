@@ -767,3 +767,49 @@ output { color: var(--tinta-3); font-size: 0.78rem; }
 @media (max-width: 850px) { .home-recursos { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .home-recursos { grid-template-columns: minmax(0, 1fr); } .home-apresentacao { padding: 17px; } .home-editor-nota { align-items: flex-start; flex-direction: column; } }
 @media (prefers-reduced-motion: reduce) { .home-recurso { transition: none; } .home-recurso:hover { transform: none; } }
+
+
+/* ---------- IDE executável: laboratório e desafios ---------- */
+.nivel[hidden] { display: none !important; }
+.lab-page { max-width: 1240px; }
+.lab-missao { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:24px; align-items:center; padding:22px; margin:24px 0; border:1px solid var(--regua); border-left:4px solid var(--brasa); border-radius:var(--raio); background:var(--folha); }
+.lab-missao h2 { margin:4px 0 8px; font-size:1.6rem; }
+.lab-missao p { margin:0; color:var(--tinta-2); max-width:70ch; }
+.lab-meta { display:grid; gap:8px; min-width:145px; font-size:.82rem; color:var(--tinta-2); }
+.lab-meta b { color:var(--tinta); font:600 1.1rem var(--f-mono); margin-right:5px; }
+.lab-toolbar { margin:14px 0; }
+.lab-dataset,.lab-ide-wrap,.lab-result { padding:18px; margin:18px 0; border:1px solid var(--regua); border-radius:var(--raio); background:var(--folha); }
+.lab-section-head { display:flex; justify-content:space-between; align-items:end; gap:16px; margin-bottom:12px; }
+.lab-section-head h2,.lab-section-head h3 { margin:0; }
+.lab-section-head .olho { margin-bottom:4px; }
+.lab-grid { min-width:650px; }
+.lab-grid td { font-family:var(--f-mono); font-size:.78rem; }
+.null-cell { color:var(--erro); font-style:italic; }
+.lab-diagnostico { margin-top:14px; }
+.lab-diagnostico .contadores { margin-bottom:12px; }
+.lab-ok { color:var(--certo); font-weight:600; }
+.lab-pendente { color:var(--brasa); font-weight:600; }
+.lab-ide-wrap { background:transparent; padding:0; border:0; }
+.lab { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+.lab-editor { min-width:0; overflow:hidden; border:1px solid var(--regua); border-radius:var(--raio); background:var(--folha); }
+.lab-editor .ide-barra { min-height:42px; }
+.lab-editor textarea { display:block; width:100%; min-height:290px; border:0; padding:14px; resize:vertical; background:var(--folha); color:var(--tinta); font: .84rem/1.55 var(--f-mono); tab-size:4; }
+.lab-editor textarea:focus { outline:none; }
+.ide-actions { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; padding:10px 12px; border-top:1px solid var(--regua); }
+.CodeMirror { height:300px; font: .84rem/1.55 var(--f-mono); background:var(--folha); color:var(--tinta); }
+.questao .CodeMirror { height:260px; }
+.CodeMirror-gutters { background:var(--folha-2); border-right:1px solid var(--regua); }
+.CodeMirror-linenumber { color:var(--tinta-3); }
+.CodeMirror-cursor { border-left:1px solid var(--brasa); }
+.CodeMirror-selected { background:color-mix(in srgb,var(--brasa) 18%,transparent) !important; }
+.ide-status { padding:6px 10px; color:var(--tinta-2); background:var(--folha-2); border-top:1px solid var(--regua); font:.72rem var(--f-mono); }
+.ide-resultado { border-top:1px solid var(--regua); max-height:420px; overflow:auto; }
+.ide-console { padding:12px 14px; white-space:pre-wrap; overflow-wrap:anywhere; font:.8rem/1.5 var(--f-mono); background:var(--folha-2); }
+.ide-console.ok { border-left:3px solid var(--certo); }
+.ide-console.erro { color:var(--erro); border-left:3px solid var(--erro); }
+.ide-result-head { display:flex; justify-content:space-between; gap:12px; padding:10px 12px; border-bottom:1px solid var(--regua); font-size:.8rem; }
+.ide-result-head span { color:var(--tinta-2); }
+.ide-empty { padding:24px; text-align:center; color:var(--tinta-2); border:1px dashed var(--regua-forte); border-radius:var(--raio); }
+.lab-aviso { margin-top:20px; }
+.ide-completa { margin:14px 0; }
+@media(max-width:760px) { .lab-missao { grid-template-columns:1fr; } .lab-meta { grid-template-columns:repeat(3,1fr); } .lab { grid-template-columns:1fr; } .lab-dataset,.lab-ide-wrap,.lab-result { padding:12px; } .lab-section-head { align-items:start; flex-direction:column; } }

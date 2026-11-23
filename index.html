@@ -14,7 +14,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&display=swap">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
   <link rel="stylesheet" href="estilo.css">
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js"></script>
   <script defer src="app.js"></script>
   <script defer src="ia.js"></script>
 </head>
@@ -38,9 +42,7 @@
       <a href="#admin" data-rota="admin">Editor</a>
     </nav>
     <div class="topo-dir">
-      <div class="nivel" id="nivel" role="group" aria-label="Nível das explicações da IA">
-        <button type="button" data-nivel="eli5">ELI5</button><button type="button" data-nivel="pleno">Pleno</button><button type="button" data-nivel="arquiteto">Arquiteto</button>
-      </div>
+      <div class="nivel" id="nivel" hidden aria-hidden="true"></div>
       <button type="button" class="icone-btn" id="logsBtn" title="Avisos recentes" aria-label="Ver avisos recentes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M5 6h14M5 12h14M5 18h9"/></svg></button>
       <button type="button" class="icone-btn" id="temaBtn" aria-label="Alternar tema"></button>
       <button type="button" class="perfil-btn" id="perfilBtn" aria-label="Abrir perfil"></button>

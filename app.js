@@ -565,6 +565,51 @@ const CONTEUDO_PADRAO = [
         "h": "## ETL e ELT\n\nETL significa extrair, transformar e carregar. ELT carrega os dados primeiro em uma plataforma de destino e transforma depois, aproveitando a capacidade de processamento do ambiente analítico. A escolha depende da origem, do destino, da governança e dos requisitos de latência.\n\nEm ambos os casos, um pipeline confiável precisa controlar entradas, transformações, saídas e falhas. A transformação não deve ser apenas um conjunto de comandos: ela representa regras de negócio que precisam ser testadas.\n\n## Qualidade de dados\n\nValide campos obrigatórios, tipos, valores permitidos, unicidade e relacionamentos. Separe registros inválidos para investigação e acompanhe métricas como volume recebido, rejeições e atraso de processamento.\n\n```python\nfrom pyspark.sql import functions as F\n\nvalidos = df.filter(\n    F.col(\"id_venda\").isNotNull() &\n    (F.col(\"valor\") >= 0)\n)\ninvalidos = df.subtract(validos)\n```\n\nO exemplo é ilustrativo: em pipelines de grande volume, prefira expressar regras de qualidade em uma única passagem e evite recalcular o mesmo conjunto de dados sem necessidade.\n\n## Idempotência e reprocessamento\n\nUma tarefa idempotente pode ser executada novamente sem produzir duplicações ou efeitos colaterais indesejados. Use chaves de negócio, controle de lotes e operações de merge quando apropriado.\n\n## Observabilidade\n\nRegistre duração, volume, contagem de rejeições, última execução bem-sucedida e causa de falhas. Alertas devem apontar um problema acionável, não apenas gerar ruído.",
         "q": [
           {
+            "mode": "code",
+            "language": "Python",
+            "p": "Desafio de código: normalize os dados de clientes antes de publicar a camada Silver.",
+            "task": "Implemente limpar_registros(rows). Cada linha tem [id, nome, email, cidade, idade, valor_pedido]. Remova IDs duplicados (mantenha a primeira ocorrência), aplique strip em nome/cidade, converta email para minúsculas, converta idade e valor_pedido para números quando possível e descarte linhas sem ID ou com email inválido. Retorne uma lista de listas na mesma ordem de colunas.",
+            "starter": `rows = [
+    ["1", " Ana Silva ", "ANA@EXEMPLO.COM", " sao paulo ", "30", "R$ 10,50"],
+    ["1", "Ana duplicada", "ana2@exemplo.com", "Rio", "31", "20"],
+    ["2", "Bia Costa", "email-invalido", "Recife", "vinte", "5"],
+]
+
+def limpar_registros(rows):
+    # TODO: remova duplicados, normalize os campos e valide o e-mail
+    return rows
+
+resultado = limpar_registros(rows)
+print(resultado)`,
+            "solution": `def limpar_registros(rows):
+    vistos = set()
+    resultado = []
+    for linha in rows:
+        id_, nome, email, cidade, idade, valor = linha
+        id_ = str(id_ or '').strip()
+        nome = str(nome or '').strip()
+        email = str(email or '').strip().lower()
+        cidade = str(cidade or '').strip().title()
+        if not id_ or id_ in vistos or '@' not in email or '.' not in email.split('@')[-1]:
+            continue
+        vistos.add(id_)
+        try: idade = int(idade)
+        except (TypeError, ValueError): idade = None
+        try: valor = float(str(valor).replace('R$', '').replace(' ', '').replace(',', '.'))
+        except (TypeError, ValueError): valor = None
+        resultado.append([id_, nome, email, cidade, idade, valor])
+    return resultado`,
+            "tests": `assert callable(limpar_registros), 'Crie a função limpar_registros(rows)'
+resultado_teste = limpar_registros([['1',' Ana ','ANA@EXEMPLO.COM ',' sao paulo ','30','R$ 10,50'], ['1','Ana 2','a2@exemplo.com','Rio','31','20'], ['2','Bia','email-invalido','Recife','vinte','5']])
+assert len(resultado_teste) == 1, 'Deve remover ID duplicado e email inválido'
+assert resultado_teste[0][1] == 'Ana', 'Remova espaços do nome'
+assert resultado_teste[0][2] == 'ana@exemplo.com', 'Normalize email para minúsculas'
+assert resultado_teste[0][3] == 'Sao Paulo', 'Padronize cidade'
+assert resultado_teste[0][4] == 30, 'Converta idade para inteiro'
+assert abs(resultado_teste[0][5] - 10.5) < 0.001, 'Converta valor monetário para número'
+print('7 verificações passaram.')`
+          },
+          {
             "p": "Qual é a diferença geral entre ETL e ELT?",
             "o": [
               "ETL transforma antes de carregar; ELT carrega e transforma no destino.",
@@ -792,7 +837,7 @@ const LINGUAGENS = ["SQL", "Python", "PySpark"];
 const ehCodigo = (q) => q && q.mode === "code";
 function questaoValida(q) {
   if (!isObj(q) || typeof q.p !== "string") return false;
-  if (ehCodigo(q)) return LINGUAGENS.includes(q.language) && ["task", "starter", "e"].every((k) => q[k] == null || typeof q[k] === "string") && typeof q.solution === "string" && q.solution.trim() !== "";
+  if (ehCodigo(q)) return LINGUAGENS.includes(q.language) && ["task", "starter", "e"].every((k) => q[k] == null || typeof q[k] === "string") && typeof q.solution === "string" && q.solution.trim() !== "" && (q.tests == null || typeof q.tests === "string");
   return Array.isArray(q.o) && q.o.length === 4 && q.o.every((o) => typeof o === "string") && Number.isInteger(q.a) && q.a >= 0 && q.a <= 3 && (q.e == null || typeof q.e === "string");
 }
 function conteudoValido(mods) {
@@ -830,7 +875,7 @@ function htmlSeguro(html) {
 const S = {
   mods: [], progresso: {}, stats: {}, rascunhos: {}, ajustes: null, tema: "claro",
   marcas: { questions: {}, lines: {} }, modos: [], temasSalvos: [], modoAtivo: "",
-  perfil: { name: "", photo: "" }, nivel: "pleno", rota: "home", rotaAnterior: ""
+  perfil: { name: "", photo: "" }, nivel: "unico", rota: "home", rotaAnterior: ""
 };
 const aulas = () => S.mods.flatMap((m) => m.l);
 const acharAula = (id) => aulas().find((l) => l.id === id) || null;
@@ -855,6 +900,19 @@ function carregarConteudo() {
   }
   const salvo = armazem.ler(K.conteudo, null);
   S.mods = conteudoValido(salvo) ? salvo : clone(CONTEUDO_PADRAO);
+  /* Migração aditiva: inclui o primeiro desafio executável sem apagar aulas,
+     questões, progresso ou personalizações já existentes. */
+  const chaveMigracaoIDE = "dbAcademyIDEChallengeMigrationV1";
+  if (armazem.bruto(chaveMigracaoIDE) !== "1") {
+    const origem = CONTEUDO_PADRAO.flatMap((m) => m.l).find((l) => l.id === "pipelines-etl");
+    const destino = acharAula("pipelines-etl");
+    const desafio = origem?.q.find((q) => ehCodigo(q) && q.tests);
+    if (destino && desafio && !destino.q.some((q) => q.mode === "code" && q.tests && q.p === desafio.p)) {
+      destino.q.push(clone(desafio));
+      armazem.gravar(K.conteudo, S.mods);
+    }
+    armazem.gravar(chaveMigracaoIDE, "1");
+  }
 }
 function salvarConteudo(msgOk) {
   if (!conteudoValido(S.mods)) { aviso("O conteúdo não passou na validação; nada foi salvo.", true); return false; }
@@ -1292,19 +1350,13 @@ const efeitos = (() => {
 })();
 
 /* ---------- 9. Nível das explicações, marcações e perfil ---------- */
-const NIVEIS = {
-  eli5: ["ELI5", "Nível ELI5: explique como para quem está começando, com analogias do dia a dia, sem jargão; defina qualquer termo técnico em uma frase."],
-  pleno: ["Pleno", "Nível Pleno: explique para um profissional de nível intermediário, com termos técnicos corretos e um exemplo prático curto."],
-  arquiteto: ["Arquiteto", "Nível Arquiteto: aprofunde em trade-offs, desempenho, custo, governança, riscos e alternativas de arquitetura."]
-};
-const nivelAtual = () => NIVEIS[S.nivel] ? S.nivel : "pleno";
-const instrucaoNivel = () => NIVEIS[nivelAtual()][1] + " ";
-function definirNivel(n) {
-  if (!NIVEIS[n]) return;
-  S.nivel = n;
-  if (!armazem.gravar(K.nivel, n)) aviso("Não foi possível salvar o nível neste navegador.", true);
-  $$("#nivel button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.nivel === n)));
-  aviso("Nível das explicações: " + NIVEIS[n][0] + ".");
+const NIVEIS = { unico: ["Padrão", "Explique com clareza técnica progressiva: comece pelo objetivo e pelos conceitos essenciais, defina termos quando necessário, apresente exemplos executáveis e aprofunde em decisões, desempenho, custo, governança e riscos quando o assunto exigir. Adapte a profundidade à pergunta sem simplificar demais nem presumir experiência avançada."] };
+const nivelAtual = () => "unico";
+const instrucaoNivel = () => NIVEIS.unico[1] + " ";
+function definirNivel() {
+  S.nivel = "unico";
+  armazem.gravar(K.nivel, "unico");
+  const seletor = $("#nivel"); if (seletor) seletor.hidden = true;
 }
 
 function carregarMarcas() {
@@ -1462,7 +1514,7 @@ function ligarTela(raiz) {
   $$(".questao", raiz).forEach(ligarQuestao);
   if ($("#mmChatForm", raiz)) ligarMapa(raiz);
   if ($("#feynmanRaiz", raiz)) ligarFeynman(raiz);
-  if ($("#labTabela", raiz)) laboratorio.ligar(raiz);
+  if ($("[data-lab-page]", raiz)) laboratorio.ligar(raiz);
   if ($("#editorRaiz", raiz)) editor.ligar(raiz);
   App.ia?.ligarGuia?.(raiz);
   prepararAnimacoes(raiz);
@@ -1653,13 +1705,14 @@ function questaoMultipla(l, q, qi) {
 function questaoCodigo(l, q, qi) {
   const chave = l.id + ":" + qi;
   const codigo = (S.rascunhos[chave] || "").trim() ? S.rascunhos[chave] : q.starter || "";
-  return '<section class="questao" data-aula="' + esc(l.id) + '" data-q="' + qi + '" data-codigo>' + topoQuestao(l, q, qi, "Prática de código · " + q.language) +
+  return '<section class="questao" data-aula="' + esc(l.id) + '" data-q="' + qi + '" data-codigo>' + topoQuestao(l, q, qi, "IDE prática · " + q.language) +
     '<div class="q-enunciado">' + htmlSeguro(q.p) + "</div>" + (q.task ? '<div class="nota-lateral pre">' + esc(q.task) + "</div>" : "") +
-    '<div class="ide"><div class="ide-barra"><span>' + esc(q.language) + '</span><button type="button" class="btn btn-texto btn-mini" data-restaurar>Restaurar código inicial</button></div>' +
+    '<div class="ide ide-completa"><div class="ide-barra"><span>IDE · ' + esc(q.language) + ' · execução local</span><button type="button" class="btn btn-texto btn-mini" data-restaurar>Restaurar código inicial</button></div>' +
     '<textarea spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Editor de código ' + esc(q.language) + '" data-editor>' + esc(codigo) + "</textarea>" +
-    '<pre class="ide-saida" data-saida hidden></pre></div>' +
-    '<div class="linha-btns q-acoes">' + (q.language === "Python" ? '<button type="button" class="btn" data-executar>▶ Executar Python</button>' : "") + '<button type="button" class="btn btn-tinta" data-avaliar>Avaliar meu código</button></div>' +
-    '<p class="mini discreto">A IA revisa o código sem executá-lo. Não inclua dados pessoais nem segredos.' + (q.language === "Python" ? " O botão Executar roda Python isolado no seu navegador." : "") + "</p>" +
+    '<div class="ide-status" data-editor-status>Editor pronto · código salvo neste navegador</div><div class="ide-resultado" data-saida hidden></div></div>' +
+    '<div class="linha-btns q-acoes">' + (q.language === "Python" ? '<button type="button" class="btn" data-executar>▶ ' + (q.tests ? 'Executar código e testes' : 'Executar Python') + '</button>' : q.language === "SQL" ? '<button type="button" class="btn" data-executar-sql>▶ Executar SQL</button>' : '') +
+    '<button type="button" class="btn btn-tinta" data-avaliar>Avaliar com IA</button></div>' +
+    '<p class="mini discreto">Python executa em ambiente isolado; SQL executa em SQLite com uma tabela de treino. PySpark exige um workspace Databricks conectado. Testes objetivos são executados de verdade quando configurados.</p>' +
     '<div data-retorno aria-live="polite"></div>' + ferramentasIA() + "</section>";
 }
 
@@ -1711,24 +1764,36 @@ function ligarQuestao(card) {
     };
   } else {
     const ed = $("[data-editor]", card); const saida = $("[data-saida]", card); const chave = aula.id + ":" + qi;
-    ed.addEventListener("keydown", (e) => {
-      if (e.key !== "Tab" || e.shiftKey) return;
-      e.preventDefault(); ed.setRangeText("    ", ed.selectionStart, ed.selectionEnd, "end"); ed.dispatchEvent(new Event("input"));
-    });
-    ed.addEventListener("input", () => { S.rascunhos[chave] = ed.value.slice(0, 12000); armazem.gravar(K.rascunhos, S.rascunhos); });
-    $("[data-restaurar]", card).onclick = () => { ed.value = q.starter || ""; S.rascunhos[chave] = ed.value; armazem.gravar(K.rascunhos, S.rascunhos); retorno.innerHTML = ""; };
+    const cm = criarEditorIDE(ed, q.language === "SQL" ? "text/x-sql" : "python");
+    const obterCodigo = () => cm ? cm.getValue() : ed.value;
+    const definirCodigo = (v) => { if (cm) cm.setValue(v); else ed.value = v; };
+    const salvarRascunho = () => { S.rascunhos[chave] = obterCodigo().slice(0, 12000); armazem.gravar(K.rascunhos, S.rascunhos); };
+    if (cm) cm.on("change", salvarRascunho); else ed.addEventListener("input", salvarRascunho);
+    ed.addEventListener("keydown", (e) => { if (e.key !== "Tab" || e.shiftKey || cm) return; e.preventDefault(); ed.setRangeText("    ", ed.selectionStart, ed.selectionEnd, "end"); ed.dispatchEvent(new Event("input")); });
+    $("[data-restaurar]", card).onclick = () => { definirCodigo(q.starter || ""); salvarRascunho(); retorno.innerHTML = ""; };
     const exec = $("[data-executar]", card);
     if (exec) exec.onclick = async () => {
-      saida.hidden = false; saida.classList.remove("erro"); exec.setAttribute("aria-busy", "true"); exec.disabled = true;
-      const r = await python.executar(ed.value, { aoEstado: (t) => saida.textContent = t });
-      saida.textContent = r.saida; saida.classList.toggle("erro", !r.ok);
+      saida.hidden = false; saida.innerHTML = '<div class="ide-console">Preparando execução…</div>'; exec.setAttribute("aria-busy", "true"); exec.disabled = true;
+      const r = await python.executar(obterCodigo(), { testes: q.tests || "", aoEstado: (t) => { const st = $("[data-editor-status]", card); if (st) st.textContent = t; } });
+      saida.innerHTML = '<div class="ide-console ' + (r.ok ? 'ok' : 'erro') + '">' + esc(r.saida) + '</div>';
+      if (r.ok && q.tests) { registrarResposta(aula.id, qi, true); concluirQuestao(aula.id, qi); retorno.innerHTML = '<div class="q-retorno certo"><strong>Desafio concluído!</strong> Todos os testes objetivos passaram. A questão foi marcada como resolvida.</div>'; desenharIndice(); }
+      else if (!r.ok && q.tests) retorno.innerHTML = '<div class="q-retorno errado"><strong>Os testes ainda não passaram.</strong> Leia a saída, corrija o código e execute novamente.</div>';
       exec.removeAttribute("aria-busy"); exec.disabled = false;
     };
+    const execSql = $("[data-executar-sql]", card);
+    if (execSql) execSql.onclick = async () => {
+      saida.hidden = false; saida.innerHTML = '<div class="ide-console">Carregando SQLite…</div>'; execSql.disabled = true;
+      try {
+        const t = await laboratorio.executarQuestaoSQL(obterCodigo());
+        saida.innerHTML = '<div class="ide-result-head"><strong>Consulta executada</strong><span>' + t.values.length + ' linha(s)</span></div>' + laboratorio.renderResultadoQuestao(t);
+      } catch (err) { saida.innerHTML = '<div class="ide-console erro">' + esc(err.message) + '</div>'; }
+      finally { execSql.disabled = false; }
+    };
     $("[data-avaliar]", card).onclick = async (e) => {
-      const b = e.currentTarget; const codigo = ed.value.trim();
+      const b = e.currentTarget; const codigo = (cm ? cm.getValue() : ed.value).trim();
       if (!codigo) { retorno.innerHTML = '<div class="q-retorno errado">Escreva sua solução no editor antes de pedir a avaliação.</div>'; return; }
       if (!App.ia) return aviso("A camada de IA não está disponível.", true);
-      b.disabled = true; ed.readOnly = true; b.setAttribute("aria-busy", "true");
+      b.disabled = true; if (cm) cm.setOption("readOnly", true); else ed.readOnly = true; b.setAttribute("aria-busy", "true");
       retorno.innerHTML = '<p class="status">A IA está revisando sua solução…</p>';
       try {
         const r = await App.ia.avaliarCodigo({ aula, q, codigo });
@@ -1736,7 +1801,7 @@ function ligarQuestao(card) {
         retorno.innerHTML = '<div class="q-retorno ' + (r.correct ? "certo" : "errado") + '"><strong>' + (r.correct ? "Sua solução atende ao desafio." : "Ainda precisa de ajustes.") + "</strong>" + esc(r.feedback) + "</div>";
         if (r.correct) { concluirQuestao(aula.id, qi); desenharIndice(); b.removeAttribute("aria-busy"); return; }
       } catch (err) { retorno.innerHTML = '<div class="q-retorno errado">' + esc(err.message) + "</div>"; }
-      b.disabled = false; ed.readOnly = false; b.removeAttribute("aria-busy");
+      b.disabled = false; if (cm) cm.setOption("readOnly", false); else ed.readOnly = false; b.removeAttribute("aria-busy");
     };
   }
 }
@@ -1810,6 +1875,17 @@ document.addEventListener("click", (e) => {
   if (ia) { e.preventDefault(); ia.dataset.iaAcao === "gerador" ? App.ia?.abrirGerador() : App.ia?.abrirChat(); }
 });
 
+/* ---------- IDE de código (CodeMirror com fallback acessível) ---------- */
+function criarEditorIDE(textarea, mode, options = {}) {
+  if (!textarea) return null;
+  if (!window.CodeMirror || textarea._cm) return textarea._cm || null;
+  const cm = window.CodeMirror.fromTextArea(textarea, { mode, theme: "default", lineNumbers: true, indentUnit: 4, tabSize: 4, indentWithTabs: false, lineWrapping: false, autofocus: false, viewportMargin: 20, extraKeys: { "Ctrl-Enter": (editor) => editor.getTextArea().closest(".lab-editor, .questao")?.querySelector("[data-lab=sql], [data-lab=py], [data-executar]")?.click() } });
+  textarea._cm = cm;
+  if (options.height) cm.setSize("100%", options.height);
+  requestAnimationFrame(() => cm.refresh());
+  return cm;
+}
+
 /* ---------- 15. Python isolado (Pyodide em Web Worker) ---------- */
 const python = (() => {
   const URL_PYODIDE = "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js";
@@ -1817,7 +1893,7 @@ const python = (() => {
   const CODIGO_WORKER = `
     let py = null;
     self.onmessage = async (e) => {
-      const { codigo, linhas, pandas, url } = e.data;
+      const { codigo, linhas, pandas, testes, url } = e.data;
       try {
         if (!py) {
           const f = self.fetch.bind(self);
@@ -1836,7 +1912,12 @@ const python = (() => {
         const ns = py.globals.get("dict")();
         if (linhas) ns.set("rows", py.toPy(linhas));
         await py.runPythonAsync(codigo, { globals: ns });
-        self.postMessage({ fase: "fim", saida: out });
+        if (testes && testes.trim()) await py.runPythonAsync(testes, { globals: ns });
+        let tabela = null;
+        if (ns.has("df")) {
+          try { const raw = await py.runPythonAsync("df.head(200).to_json(orient='split', date_format='iso')", { globals: ns }); tabela = JSON.parse(raw); } catch (_) {}
+        }
+        self.postMessage({ fase: "fim", saida: out, tabela, testes: !!(testes && testes.trim()) });
       } catch (err) { self.postMessage({ fase: "erro", saida: String((err && err.message) || err).slice(-1000) }); }
     };`;
   let worker = null, ocupado = false;
@@ -1845,7 +1926,7 @@ const python = (() => {
     const w = new Worker(url); setTimeout(() => URL.revokeObjectURL(url), 1000); return w;
   }
   /* O runtime fica aquecido entre execuções; cada execução usa um namespace novo. */
-  function executar(codigo, { linhas = null, pandas = false, limite = 3000, tempo = 4000, aoEstado = () => {} } = {}) {
+  function executar(codigo, { linhas = null, pandas = false, testes = "", limite = 8000, tempo = 10000, aoEstado = () => {} } = {}) {
     codigo = String(codigo || "");
     if (!codigo.trim()) return Promise.resolve({ ok: false, saida: "Escreva algum código antes de executar." });
     if (codigo.length > limite) return Promise.resolve({ ok: false, saida: "Limite: " + limite.toLocaleString("pt-BR") + " caracteres." });
@@ -1856,21 +1937,21 @@ const python = (() => {
     if (frio) worker = novoWorker();
     aoEstado(frio ? "Carregando o Python isolado (na primeira vez leva alguns segundos)…" : "Executando…");
     return new Promise((ok) => {
-      const fim = (sucesso, texto, descartar) => {
+      const fim = (sucesso, texto, descartar, meta = {}) => {
         clearTimeout(timer); ocupado = false;
         if (worker) worker.onmessage = null;
         if (descartar && worker) { worker.terminate(); worker = null; }
-        ok({ ok: sucesso, saida: (texto || "(sem saída)").slice(0, 4000) });
+        ok({ ok: sucesso, saida: (texto || "(sem saída)").slice(0, 6000), tabela: meta.tabela || null, testes: !!meta.testes });
       };
       let timer = setTimeout(() => fim(false, "O ambiente Python não carregou em 60 segundos. Verifique a conexão.", true), 60000);
       worker.onmessage = (e) => {
         const m = e.data;
         if (m.fase === "pronto") { clearTimeout(timer); aoEstado("Executando…"); timer = setTimeout(() => fim(false, "Tempo limite de " + tempo / 1000 + " segundos excedido (possível laço infinito). O processo foi encerrado.", true), tempo); }
-        else if (m.fase === "fim") fim(true, m.saida.trimEnd());
+        else if (m.fase === "fim") fim(true, m.saida.trimEnd(), false, m);
         else fim(false, m.saida);
       };
       worker.onerror = (e) => fim(false, "Falha no ambiente Python: " + (e.message || "erro desconhecido"), true);
-      worker.postMessage({ codigo, linhas, pandas, url: URL_PYODIDE });
+      worker.postMessage({ codigo, linhas, pandas, testes, url: URL_PYODIDE });
     });
   }
   return { executar };
@@ -2197,77 +2278,152 @@ function ligarMapa(raiz) {
   };
 }
 
-/* ---------- 19. Laboratório de dados sujos ---------- */
+/* ---------- 19. Laboratório de dados sujos + IDE executável ---------- */
 const laboratorio = (() => {
   const COLS = ["id", "nome", "email", "cidade", "idade", "valor_pedido"];
   const NOMES = ["Ana", "Bruno", "Carla", "Diego", "Eva", "Felipe", "Gi", "Hugo", "Iara", "João"];
   const SOBRE = ["Silva", "Lima", "Souza", "Alves", "Costa", "Mendes", "Rocha", "Santos"];
   const CIDADES = ["São Paulo", "sao paulo", " Rio de Janeiro", "RIO DE JANEIRO", "Belo Horizonte ", "Curitiba", "curitiba", "Recife", ""];
   const sorte = (p) => Math.random() < p, pega = (a) => a[Math.floor(Math.random() * a.length)], entre = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
-  let linhas = [];
+  let linhas = [], originalLinhas = [], sqlDb = null, sqlReady = false, pythonResultado = null, editores = {};
   function gerar() {
-    const n = entre(8, 16); const out = [];
+    const n = entre(10, 16), out = [];
     for (let i = 0; i < n; i++) {
       const pn = pega(NOMES), sn = pega(SOBRE);
-      const id = i > 0 && sorte(0.12) ? out[0][0] : String(100 + entre(0, n + 3));
-      let nome = pn + " " + sn; if (sorte(0.22)) nome = "  " + nome + " "; if (sorte(0.12)) nome = null;
-      let email = (sorte(0.5) ? pn + "." + sn : pn + sn).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") + (sorte(0.18) ? "@email" : "@email.com"); if (sorte(0.13)) email = null;
-      const idade = sorte(0.2) ? "" : sorte(0.15) ? "trinta" : String(entre(18, 72));
-      let valor = sorte(0.18) ? "R$ " + entre(10, 999) : (Math.random() * 1000).toFixed(2); if (sorte(0.18)) valor = null;
+      const id = i > 0 && sorte(0.16) ? out[0][0] : String(100 + entre(0, n + 3));
+      let nome = pn + " " + sn; if (sorte(0.25)) nome = "  " + nome + " "; if (sorte(0.1)) nome = null;
+      let email = (sorte(0.5) ? pn + "." + sn : pn + sn).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") + (sorte(0.2) ? "@email" : "@email.com"); if (sorte(0.12)) email = null;
+      const idade = sorte(0.16) ? "" : sorte(0.12) ? "trinta" : String(entre(18, 72));
+      let valor = sorte(0.2) ? "R$ " + entre(10, 999) : (Math.random() * 1000).toFixed(2); if (sorte(0.15)) valor = null;
       out.push([id, nome, email, pega(CIDADES), idade, valor]);
     }
     return out;
   }
-  const tabelaHtml = () => '<div class="tabela-rolagem"><table class="tabela" id="labTabela"><thead><tr>' + COLS.map((c) => "<th>" + c + "</th>").join("") + "</tr></thead><tbody>" +
-    linhas.map((l) => "<tr>" + l.map((v) => '<td contenteditable="true" spellcheck="false">' + (v == null ? "" : esc(v)) + "</td>").join("") + "</tr>").join("") + "</tbody></table></div>";
-  function lerTabela(raiz) { return $$("#labTabela tbody tr", raiz).map((tr) => $$("td", tr).map((td) => td.textContent === "" ? null : td.textContent)); }
+  const tabelaHtml = (rows = linhas, cols = COLS) => '<div class="tabela-rolagem"><table class="tabela lab-grid"><thead><tr>' + cols.map((c) => "<th>" + esc(c) + "</th>").join("") + "</tr></thead><tbody>" +
+    rows.map((l) => "<tr>" + l.map((v) => '<td>' + (v == null ? '<span class="null-cell">NULL</span>' : esc(v)) + "</td>").join("") + "</tr>").join("") + "</tbody></table></div>";
   function validar(rows) {
     const vistos = new Set(); let dup = 0, vazios = 0, emails = 0, espacos = 0;
     for (const r of rows) {
-      const id = (r[0] || "").trim(); if (id) { if (vistos.has(id)) dup++; vistos.add(id); }
+      const id = String(r[0] ?? "").trim(); if (id) { if (vistos.has(id)) dup++; vistos.add(id); }
       vazios += r.filter((v) => v == null || !String(v).trim()).length;
-      if (r[2] && r[2].trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r[2].trim())) emails++;
+      if (r[2] && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(r[2]).trim())) emails++;
       if (r.some((v) => typeof v === "string" && v !== v.trim())) espacos++;
     }
     return [["Registros", rows.length], ["IDs duplicados", dup], ["Campos vazios", vazios], ["E-mails inválidos", emails], ["Linhas com espaços extras", espacos]];
   }
-  const PY_PADRAO = 'import pandas as pd\n\ndf = pd.DataFrame(rows, columns=["id", "nome", "email", "cidade", "idade", "valor_pedido"])\ndf = df.drop_duplicates()\ndf["nome"] = df["nome"].str.strip()\nprint(df.fillna("—").to_string(index=False))';
-  async function rodarSql(sql, rows) {
+  const SQL_PADRAO = `SELECT * FROM dirty_data ORDER BY id;`;
+  const PY_PADRAO = `import pandas as pd
+
+# A tabela original está disponível na variável rows.
+df = pd.DataFrame(rows, columns=["id", "nome", "email", "cidade", "idade", "valor_pedido"])
+
+# MISSÃO: complete a limpeza abaixo.
+# 1) Remova IDs duplicados, mantendo a primeira ocorrência.
+# 2) Remova espaços de nome/cidade e padronize email em minúsculas.
+# 3) Converta idade e valor_pedido para números (use errors="coerce").
+# 4) Remova e-mails inválidos e linhas sem campos obrigatórios.
+
+# Escreva sua solução aqui. O DataFrame final deve continuar se chamando df.
+df`;
+
+  function fecharDb() { try { sqlDb?.close(); } catch (_) {} sqlDb = null; sqlReady = false; }
+  async function obterDb(rows) {
+    if (sqlDb && sqlReady) return sqlDb;
     await carregarScript("https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js", "sqljs");
     const SQL = await window.initSqlJs({ locateFile: (f) => "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/" + f });
-    const db = new SQL.Database();
-    try {
-      db.run("CREATE TABLE dirty_data (" + COLS.map((c) => c + " TEXT").join(", ") + ")");
-      const st = db.prepare("INSERT INTO dirty_data VALUES (?,?,?,?,?,?)"); rows.forEach((r) => st.run(r)); st.free();
-      const res = db.exec(sql);
-      if (!res.length) return "SQL executado. " + db.getRowsModified() + " linha(s) afetada(s).";
-      return res.map((r) => r.columns.join(" | ") + "\n" + r.values.map((v) => v.map((x) => x == null ? "NULL" : x).join(" | ")).join("\n")).join("\n\n");
-    } finally { db.close(); }
+    sqlDb = new SQL.Database();
+    sqlDb.run("CREATE TABLE dirty_data (id TEXT, nome TEXT, email TEXT, cidade TEXT, idade TEXT, valor_pedido TEXT)");
+    const st = sqlDb.prepare("INSERT INTO dirty_data VALUES (?,?,?,?,?,?)");
+    rows.forEach((r) => st.run(COLS.map((_, i) => r[i] == null ? null : String(r[i])))); st.free(); sqlReady = true;
+    return sqlDb;
+  }
+  function consultaTabela(db, sql = "SELECT * FROM dirty_data") {
+    const r = db.exec(sql); if (!r.length) return { columns: COLS, values: [], changes: db.getRowsModified() };
+    return { columns: r[0].columns, values: r[0].values, changes: db.getRowsModified() };
+  }
+  function mostrarTabela(slot, tabela) {
+    if (!tabela || !tabela.columns) { slot.innerHTML = ""; return; }
+    slot.innerHTML = '<div class="ide-result-head"><strong>Resultado executado</strong><span>' + tabela.values.length + ' linha(s) · ' + tabela.columns.length + ' coluna(s)</span></div>' + tabelaHtml(tabela.values, tabela.columns);
+  }
+  function mostrarDiagnostico(root, rows) {
+    const v = validar(rows), ok = v[1][1] === 0 && v[2][1] === 0 && v[3][1] === 0 && v[4][1] === 0;
+    $("#labDiag", root).innerHTML = '<div class="lab-diagnostico"><div class="contadores">' + v.map(([k, n]) => '<div><b>' + n + '</b>' + k + '</div>').join("") + '</div><p class="' + (ok ? 'lab-ok' : 'lab-pendente') + '">' + (ok ? 'Objetivo atingido: não foram encontrados duplicados, campos vazios, e-mails inválidos ou espaços extras.' : 'Ainda existem problemas. Continue ajustando a consulta ou o código e valide novamente.') + '</p></div>';
   }
   return {
-    tela() {
-      linhas = gerar();
-      return '<div class="coluna-larga"><p class="olho">Laboratório de dados</p><h1>Limpeza de dados</h1><p class="lead">Uma tabela nova e bagunçada a cada visita: IDs repetidos, e-mails quebrados, espaços sobrando, idade escrita por extenso. Corrija à mão ou com SQL/Python e valide.</p>' +
-        '<div class="linha-btns"><button type="button" class="btn" data-lab="novo">Gerar novos dados</button><button type="button" class="btn btn-tinta" data-lab="validar">Validar tabela atual</button></div>' +
-        '<div id="labTabelaCaixa" class="secao">' + tabelaHtml() + '</div><div id="labDiag" aria-live="polite"></div>' +
-        '<div class="lab"><div><label class="campo"><span>SQL (SQLite no navegador)</span><textarea id="labSql" spellcheck="false">SELECT * FROM dirty_data;</textarea></label><button type="button" class="btn" data-lab="sql">Executar SQL</button></div>' +
-        '<div><label class="campo"><span>Python (pandas)</span><textarea id="labPy" spellcheck="false">' + esc(PY_PADRAO) + '</textarea></label><button type="button" class="btn" data-lab="py">Executar Python</button></div></div>' +
-        '<pre class="ide-saida" id="labSaida" hidden></pre><p class="mini discreto">As execuções não alteram a tabela acima: a validação lê o que está escrito nas células. SQLite e Pyodide são baixados sob demanda.</p></div>';
+    async executarQuestaoSQL(sql) {
+      await carregarScript("https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js", "sqljs");
+      const SQL = await window.initSqlJs({ locateFile: (f) => "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/" + f });
+      const db = new SQL.Database();
+      try {
+        db.run("CREATE TABLE dirty_data (id TEXT, nome TEXT, email TEXT, cidade TEXT, idade TEXT, valor_pedido TEXT)");
+        const sample = [["1"," Ana Silva ","ANA@EXEMPLO.COM"," sao paulo ","30","R$ 10,50"],["1","Ana duplicada","ana2@exemplo.com","Rio","31","20"],["2","Bia Costa","email-invalido","Recife","vinte","5"],["3","Caio Lima","caio@exemplo.com","Curitiba","28","99.90"]];
+        const st = db.prepare("INSERT INTO dirty_data VALUES (?,?,?,?,?,?)"); sample.forEach((r) => st.run(r)); st.free();
+        const res = db.exec(String(sql || ""));
+        if (res.length) return { columns: res[0].columns, values: res[0].values };
+        const fallback = db.exec("SELECT * FROM dirty_data ORDER BY id")[0];
+        return { columns: fallback.columns, values: fallback.values, changes: db.getRowsModified() };
+      } finally { db.close(); }
     },
-    ligar(raiz) {
-      const saida = $("#labSaida", raiz);
-      const mostra = (t, erro) => { saida.hidden = false; saida.textContent = t; saida.classList.toggle("erro", !!erro); };
-      raiz.addEventListener("click", async (e) => {
+    renderResultadoQuestao(tabela) { return tabelaHtml(tabela.values || [], tabela.columns || []); },
+    tela() {
+      linhas = gerar(); originalLinhas = clone(linhas); fecharDb(); pythonResultado = null; editores = {};
+      return '<div class="coluna-larga lab-page" data-lab-page><p class="olho">Laboratório prático · SQL + Python</p><h1>Limpeza de dados</h1><p class="lead">Você recebeu uma tabela operacional com dados sujos. Sua missão é corrigir os registros de verdade, executar consultas e conferir o resultado em uma grade — não apenas imprimir comandos.</p>' +
+        '<section class="lab-missao"><div><span class="ticket-kicker">MISSÃO</span><h2>Prepare a tabela para a camada Silver</h2><p>Remova IDs duplicados, normalize nome, e-mail e cidade, converta idade e valor do pedido para números e elimine registros sem ID, nome, cidade, idade, valor ou com e-mail inválido.</p></div><div class="lab-meta"><span><b id="labTotal">' + linhas.length + '</b> linhas de origem</span><span><b>2</b> linguagens</span><span><b>1</b> objetivo verificável</span></div></section>' +
+        '<div class="linha-btns lab-toolbar"><button type="button" class="btn" data-lab="novo">↻ Novo conjunto de dados</button><button type="button" class="btn btn-tinta" data-lab="validar">✓ Verificar qualidade</button><button type="button" class="btn btn-texto" data-lab="reset">Restaurar banco original</button></div>' +
+        '<section class="lab-dataset"><div class="lab-section-head"><div><p class="olho">Fonte de dados</p><h3>dirty_data</h3></div><span class="mini discreto">Amostra real do banco em memória</span></div><div id="labTabelaCaixa">' + tabelaHtml() + '</div><div id="labDiag" aria-live="polite"></div></section>' +
+        '<section class="lab-ide-wrap"><div class="lab-section-head"><div><p class="olho">Ambiente de desenvolvimento</p><h2>SQL & Python IDE</h2></div><span class="pill">Execução local isolada</span></div>' +
+        '<div class="lab"><article class="lab-editor"><div class="ide-barra"><span>▣ SQL · SQLite</span><span class="mini">Banco persistente nesta sessão</span></div><textarea id="labSql" spellcheck="false">' + esc(SQL_PADRAO) + '</textarea><div class="ide-actions"><button type="button" class="btn btn-tinta" data-lab="sql">▶ Executar SQL</button><span class="mini discreto">SELECT, UPDATE, DELETE, INSERT, CREATE</span></div></article>' +
+        '<article class="lab-editor"><div class="ide-barra"><span>▣ Python · pandas</span><span class="mini">Pyodide em Web Worker</span></div><textarea id="labPy" spellcheck="false">' + esc(PY_PADRAO) + '</textarea><div class="ide-actions"><button type="button" class="btn btn-tinta" data-lab="py">▶ Executar Python</button><span class="mini discreto">pandas disponível · sem acesso à rede</span></div></article></div>' +
+        '<section class="lab-result"><div class="lab-section-head"><div><p class="olho">Console e visualização</p><h3>Resultado da execução</h3></div><span class="mini discreto" id="labRunState">Aguardando execução</span></div><div id="labResultado" class="lab-result-body"><div class="ide-empty">Execute uma consulta SQL ou um script Python para ver aqui os resultados em tabela.</div></div><div class="linha-btns" id="labAplicarWrap" hidden><button type="button" class="btn" data-lab="aplicar">Aplicar resultado Python ao conjunto de dados</button></div></section></section>' +
+        '<p class="mini discreto lab-aviso">Este laboratório executa SQLite e Python/pandas no seu navegador. Ele não se conecta a um workspace Databricks nem executa Spark distribuído; PySpark real exige um cluster ou SQL Warehouse conectado.</p></div>';
+    },
+    ligar(root) {
+      const sqlEl = $("#labSql", root), pyEl = $("#labPy", root), result = $("#labResultado", root), state = $("#labRunState", root);
+      const sqlCM = criarEditorIDE(sqlEl, "text/x-sql", { height: 300 });
+      const pyCM = criarEditorIDE(pyEl, "python", { height: 360 });
+      editores = { sqlCM, pyCM };
+      const get = (cm, el) => cm ? cm.getValue() : el.value;
+      const setState = (t, erro = false) => { state.textContent = t; state.classList.toggle("erro", erro); };
+      const runSQL = async () => {
+        const db = await obterDb(linhas), sql = get(sqlCM, sqlEl);
+        const res = consultaTabela(db, sql);
+        const ehConsulta = /^\s*(select|with|pragma|explain)\b/i.test(sql);
+        const vis = ehConsulta ? res : consultaTabela(db, "SELECT * FROM dirty_data ORDER BY id");
+        mostrarTabela(result, vis);
+        linhas = consultaTabela(db, "SELECT * FROM dirty_data ORDER BY id").values.map((r) => r.map((x) => x == null ? null : String(x)));
+        $("#labTabelaCaixa", root).innerHTML = tabelaHtml(); $("#labTotal", root).textContent = linhas.length;
+        $("#labAplicarWrap", root).hidden = true;
+        setState(ehConsulta ? 'Consulta concluída' : (res.changes + ' linha(s) alterada(s) · tabela sincronizada'));
+      };
+      root.addEventListener("click", async (e) => {
         const b = e.target.closest("[data-lab]"); if (!b) return;
         const acao = b.dataset.lab;
-        if (acao === "novo") { linhas = gerar(); $("#labTabelaCaixa", raiz).innerHTML = tabelaHtml(); $("#labDiag", raiz).innerHTML = ""; return; }
-        if (acao === "validar") { $("#labDiag", raiz).innerHTML = '<div class="contadores">' + validar(lerTabela(raiz)).map(([k, v]) => "<div><b>" + v + "</b>" + k + "</div>").join("") + "</div>"; return; }
+        if (acao === "novo" || acao === "reset") { linhas = acao === "novo" ? gerar() : clone(originalLinhas); if (acao === "novo") originalLinhas = clone(linhas); fecharDb(); pythonResultado = null; $("#labTabelaCaixa", root).innerHTML = tabelaHtml(); $("#labTotal", root).textContent = linhas.length; $("#labDiag", root).innerHTML = ""; result.innerHTML = '<div class="ide-empty">Novo conjunto de dados carregado. Execute uma consulta para começar.</div>'; $("#labAplicarWrap", root).hidden = true; setState("Banco original restaurado"); return; }
+        if (acao === "validar") { mostrarDiagnostico(root, linhas); return; }
         b.disabled = true; b.setAttribute("aria-busy", "true");
         try {
-          if (acao === "sql") { mostra("Carregando SQLite…"); mostra(await rodarSql($("#labSql", raiz).value, lerTabela(raiz))); }
-          if (acao === "py") { const r = await python.executar($("#labPy", raiz).value, { linhas: lerTabela(raiz), pandas: true, limite: 8000, tempo: 10000, aoEstado: (t) => mostra(t) }); mostra(r.saida, !r.ok); }
-        } catch (err) { mostra((acao === "sql" ? "Erro SQL: " : "") + err.message, true); }
-        b.disabled = false; b.removeAttribute("aria-busy");
+          if (acao === "sql") { setState("Executando SQL…"); await runSQL(); }
+          if (acao === "py") {
+            setState("Carregando Python/pandas e executando…"); result.innerHTML = '<div class="ide-console">Preparando ambiente Python…</div>';
+            const code = get(pyCM, pyEl);
+            const r = await python.executar(code, { linhas, pandas: true, limite: 12000, tempo: 15000, aoEstado: setState });
+            if (!r.ok) { result.innerHTML = '<div class="ide-console erro">' + esc(r.saida) + '</div>'; setState("Python encontrou um erro", true); }
+            else {
+              pythonResultado = r.tabela;
+              result.innerHTML = '<div class="ide-console ok">' + esc(r.saida || "Execução concluída sem mensagens no console.") + '</div>';
+              if (r.tabela) { mostrarTabela(result, r.tabela); $("#labAplicarWrap", root).hidden = false; setState("Python executado · DataFrame detectado"); }
+              else setState("Python executado · nenhum DataFrame chamado df foi encontrado");
+            }
+          }
+          if (acao === "aplicar") {
+            if (!pythonResultado) throw new Error("Execute um script que produza um DataFrame chamado df antes de aplicar.");
+            const cols = pythonResultado.columns || [], values = pythonResultado.data || [];
+            if (!cols.length) throw new Error("O DataFrame não possui colunas.");
+            const normalized = values.map((r) => COLS.map((c) => { const i = cols.indexOf(c); return i < 0 ? null : r[i] == null ? null : String(r[i]); }));
+            linhas = normalized; fecharDb(); $("#labTabelaCaixa", root).innerHTML = tabelaHtml(); $("#labTotal", root).textContent = linhas.length; mostrarDiagnostico(root, linhas); $("#labAplicarWrap", root).hidden = true; setState("Resultado Python aplicado ao conjunto de dados");
+          }
+        } catch (err) { result.innerHTML = '<div class="ide-console erro">' + esc(err.message) + '</div>'; setState("Falha na execução", true); }
+        finally { b.disabled = false; b.removeAttribute("aria-busy"); }
       });
     }
   };
@@ -2345,7 +2501,8 @@ const editor = (() => {
       if (ehCodigo(q)) {
         form = base + '<div class="grade-2"><label class="campo"><span>Linguagem</span><select id="edQLang">' + LINGUAGENS.map((l) => opt(l, l, l === q.language)).join("") + '</select></label><div></div></div>' +
           '<label class="campo"><span>Instruções e requisitos</span><textarea id="edQTask" rows="3">' + esc(q.task || "") + "</textarea></label>" +
-          '<div class="grade-2"><label class="campo"><span>Código inicial</span><textarea id="edQStarter" rows="6" class="mono">' + esc(q.starter || "") + '</textarea></label><label class="campo"><span>Solução de referência (usada na correção)</span><textarea id="edQSol" rows="6" class="mono">' + esc(q.solution || "") + "</textarea></label></div>" + expl;
+          '<div class="grade-2"><label class="campo"><span>Código inicial</span><textarea id="edQStarter" rows="6" class="mono">' + esc(q.starter || "") + '</textarea></label><label class="campo"><span>Solução de referência (usada na correção)</span><textarea id="edQSol" rows="6" class="mono">' + esc(q.solution || "") + "</textarea></label></div>" +
+          '<label class="campo"><span>Testes objetivos Python (opcional)</span><textarea id="edQTests" rows="5" class="mono">' + esc(q.tests || "") + '</textarea><small>Use assert para verificar o resultado. Os testes são executados no navegador após o código do aluno.</small></label>' + expl;
       } else {
         const partes = partesEnunciado(q.p); const lv = String(q.lv || "").replace(/^IA · /, "").split(" · ");
         const nivel = ["Fácil", "Médio", "Difícil"].find((n) => lv.includes(n)) || ""; const tipo = lv.filter((x) => x && x !== nivel).join(" · ");
@@ -2446,7 +2603,7 @@ const editor = (() => {
     if (ehCodigo(q)) {
       const sol = $("#edQSol").value; if (!sol.trim()) return aviso("A solução de referência é obrigatória.", true);
       const language = $("#edQLang").value;
-      nova = { mode: "code", p: esc(p), task: $("#edQTask").value, language, starter: $("#edQStarter").value, solution: sol, e, lv: "Prática de código · " + language };
+      nova = { mode: "code", p: esc(p), task: $("#edQTask").value, language, starter: $("#edQStarter").value, solution: sol, tests: $("#edQTests")?.value || q.tests || "", e, lv: "Prática de código · " + language };
     } else {
       const o = [0, 1, 2, 3].map((i) => $("#edQO" + i).value.trim());
       if (o.some((x) => !x)) return aviso("Preencha as quatro alternativas.", true);
@@ -2471,7 +2628,7 @@ const editor = (() => {
       const qs = d.questions.map((q) => {
         if (ehCodigo(q)) {
           if (typeof q.p !== "string" || !LINGUAGENS.includes(q.language) || !String(q.solution || "").trim()) throw new Error("Há uma prática de código incompleta no arquivo.");
-          return { mode: "code", p: q.p, task: String(q.task || ""), language: q.language, starter: String(q.starter || ""), solution: String(q.solution), e: String(q.e || ""), lv: "Prática de código · " + q.language };
+          return { mode: "code", p: q.p, task: String(q.task || ""), language: q.language, starter: String(q.starter || ""), solution: String(q.solution), tests: String(q.tests || ""), e: String(q.e || ""), lv: "Prática de código · " + q.language };
         }
         if (typeof q.p !== "string" || !Array.isArray(q.o) || q.o.length !== 4 || !Number.isInteger(q.a) || q.a < 0 || q.a > 3) throw new Error("Há uma questão de múltipla escolha inválida no arquivo.");
         const n = { p: q.p, o: q.o.map(String), a: q.a, e: String(q.e || "") }; if (typeof q.lv === "string") n.lv = q.lv; return n;
@@ -2631,7 +2788,7 @@ const editor = (() => {
         case "aula-subir": case "aula-descer": { const arr = S.mods[E.mi].l; return mudarConteudo(() => mover(arr, arr.indexOf(a), d.acao === "aula-subir" ? -1 : 1)); }
         case "apagar-aula": if (a && confirm("Excluir a aula \"" + a.t + "\" e suas " + a.q.length + " questões?")) mudarConteudo(() => { S.mods[E.mi].l.splice(S.mods[E.mi].l.indexOf(a), 1); delete S.progresso[a.id]; delete S.stats[a.id]; E.aulaId = ""; }, "Aula excluída."); return;
         case "nova-questao": return a && mudarConteudo(() => { a.q.push({ p: "Nova questão", o: ["Alternativa A", "Alternativa B", "Alternativa C", "Alternativa D"], a: 0, e: "" }); E.qi = a.q.length - 1; }, "Questão criada. Edite o texto abaixo.");
-        case "nova-pratica": return a && mudarConteudo(() => { a.q.push({ mode: "code", p: "Nova prática de código", task: "", language: "Python", starter: "", solution: "print('ok')", e: "", lv: "Prática de código · Python" }); E.qi = a.q.length - 1; }, "Prática criada. Edite abaixo.");
+        case "nova-pratica": return a && mudarConteudo(() => { a.q.push({ mode: "code", p: "Nova prática de código", task: "", language: "Python", starter: "", solution: "print('ok')", tests: "", e: "", lv: "Prática de código · Python" }); E.qi = a.q.length - 1; }, "Prática criada. Edite abaixo.");
         case "salvar-questao": return salvarQuestao();
         case "q-subir": case "q-descer": return a && mudarConteudo(() => { if (mover(a.q, E.qi, d.acao === "q-subir" ? -1 : 1)) { E.qi += d.acao === "q-subir" ? -1 : 1; delete S.progresso[a.id]; delete S.stats[a.id]; } });
         case "apagar-questao": if (a && confirm("Excluir esta questão?")) mudarConteudo(() => { a.q.splice(E.qi, 1); delete S.progresso[a.id]; delete S.stats[a.id]; E.qi = Math.max(0, E.qi - 1); }, "Questão excluída."); return;
@@ -2742,14 +2899,15 @@ function iniciar() {
   const tema = armazem.bruto(K.tema);
   S.tema = (tema === "dark" || tema === "light" ? tema : S.ajustes.defaultTheme) === "dark" ? "escuro" : "claro";
   carregarMarcas(); carregarPerfil();
-  S.nivel = NIVEIS[armazem.bruto(K.nivel)] ? armazem.bruto(K.nivel) : "pleno";
+  S.nivel = "unico";
+  armazem.gravar(K.nivel, "unico");
   const modos = armazem.ler(K.modos, []); S.modos = Array.isArray(modos) ? modos.filter((m) => isObj(m) && typeof m.id === "string" && conteudoValido(m.modules)).slice(0, LIMITE_MODOS) : [];
   const temas = armazem.ler(K.temasSalvos, []); S.temasSalvos = Array.isArray(temas) ? temas.filter((t) => isObj(t) && typeof t.name === "string" && isObj(t.settings)).slice(0, LIMITE_TEMAS) : [];
   S.modoAtivo = armazem.bruto(K.modoAtivo) || "";
 
   efeitos.iniciar();
   aplicarAjustes(); desenharTema(); desenharPerfil();
-  $$("#nivel button").forEach((b) => { b.setAttribute("aria-pressed", String(b.dataset.nivel === S.nivel)); b.title = "Nível das explicações: " + NIVEIS[b.dataset.nivel][0]; b.onclick = () => definirNivel(b.dataset.nivel); });
+  const nivelUI = $("#nivel"); if (nivelUI) nivelUI.hidden = true;
   $("#temaBtn").onclick = alternarTema;
   $("#perfilBtn").onclick = abrirPerfil;
   $("#logsBtn").onclick = abrirLogs;

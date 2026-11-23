@@ -14,9 +14,9 @@ O projeto combina aulas estruturadas (Lakehouse, Delta Lake, PySpark, Spark SQL,
 
 ### Principais Recursos
 
-* **Página Inicial & Navegação:** Apresenta os principais recursos da plataforma com atalhos diretos para a trilha de estudos, Radar de Skills, laboratório de limpeza de dados (SQL e Python), Datrics, modo *Ensine o Estagiário*, mapas mentais e Editor.
+* **Página Inicial & Navegação:** Apresenta os principais recursos da plataforma com atalhos diretos para a trilha de estudos, Radar de Skills, IDE de limpeza de dados com SQL/SQLite e Python/pandas, resultados em grade e aplicação das transformações, Datrics, modo *Ensine o Estagiário*, mapas mentais e Editor.
 * **Trilha de Estudos & Prática:** 4 módulos e 12 aulas aprofundadas contendo cards de estudo, questões de múltipla escolha e desafios de código com execução em Python isolado no navegador (via Pyodide / Web Worker).
-* **Tutor de IA (Datrics):** Chat flutuante contextualizado com ajuste de profundidade das explicações (*ELI5*, *Pleno*, *Arquiteto*), diagnóstico de erros, geração de questões e *fallback* automático entre múltiplos provedores (Gemini, OpenRouter, Groq, Cloudflare Workers AI, NVIDIA NIM, Cohere, Z.AI, SambaNova Cloud e Mistral Studio).
+* **Tutor de IA (Datrics):** Chat flutuante contextualizado com um único estilo adaptativo de explicação, sem seletor de nível, diagnóstico de erros, geração de questões e *fallback* automático entre múltiplos provedores (Gemini, OpenRouter, Groq, Cloudflare Workers AI, NVIDIA NIM, Cohere, Z.AI, SambaNova Cloud e Mistral Studio).
 * **Mapas Mentais com Pesquisa Web:** Criador de mapas mentais interativos exportáveis em SVG/PNG. Consulta a web antes de cada criação ou alteração para fundamentar afirmações factuais, salvando e exibindo os links e trechos na seção *"Fontes consultadas na web"*.
 * **Ferramentas de Estudo:** Matriz e Radar de *Skills* com mapa de calor por aula, laboratório de limpeza de dados sujos, dinâmica *Ensine o Estagiário* e sistema de marcação para trechos e questões.
 * **Personalização & Editor Visual:** Editor integrado para gerenciar aulas, identidade visual (temas claro/escuro, paletas de cores e tipografia) e backup local/criptografado das configurações e chaves de API.
@@ -43,7 +43,7 @@ It pairs structured lessons (Lakehouse, Delta Lake, PySpark, Spark SQL, Auto Loa
 
 * **Home Dashboard & Navigation:** Showcases core platform capabilities with direct shortcuts to the learning path, Skill Radar, SQL & Python data cleaning lab, Datrics, *Teach the Intern* mode, mind maps, and the built-in Editor.
 * **Learning Path & Hands-on Practice:** 4 modules and 12 in-depth lessons featuring study cards, multiple-choice questions, and coding challenges executed safely in the browser using an isolated Python environment (Pyodide via Web Worker).
-* **AI Tutor (Datrics):** Context-aware floating assistant with adjustable explanation depth (*ELI5*, *Mid-level*, *Architect*), error diagnostics, custom question generation, and automatic fallback across multiple providers (Gemini, OpenRouter, Groq, Cloudflare Workers AI, NVIDIA NIM, Cohere, Z.AI, SambaNova Cloud, and Mistral Studio).
+* **AI Tutor (Datrics):** Context-aware floating assistant with unified adaptive explanation style (no visible level selector), error diagnostics, custom question generation, and automatic fallback across multiple providers (Gemini, OpenRouter, Groq, Cloudflare Workers AI, NVIDIA NIM, Cohere, Z.AI, SambaNova Cloud, and Mistral Studio).
 * **Web-Grounded Mind Maps:** Interactive mind map generator exportable to SVG/PNG. Queries the web prior to every creation or edit to ground factual claims, saving and displaying source links and snippets under *"Web Sources Consulted"*.
 * **Study Tools:** Skill Radar and lesson heatmaps, a dirty-data cleaning laboratory, *Teach the Intern* active-recall mode, and bookmarking for code snippets and exercises.
 * **Customization & Built-in Editor:** Live content and visual identity editor (light/dark modes, color palettes, typography) with encrypted local backup support for API keys, custom lessons, and progress.
@@ -59,3 +59,10 @@ It pairs structured lessons (Lakehouse, Delta Lake, PySpark, Spark SQL, Auto Loa
 ## Adicionar questões a um módulo existente
 
 No chat do Datrics, pedidos como `adicione 2 questões no módulo Delta Lake` ou `crie 3 questões no módulo 2` são direcionados ao módulo indicado. As questões são anexadas à aula atualmente aberta dentro desse módulo; se nenhuma aula desse módulo estiver aberta, são anexadas à primeira aula. Se o módulo ainda não tiver aulas, o sistema cria uma aula chamada **Questões adicionais** dentro do próprio módulo. O sistema não cria o módulo genérico **Questões geradas por IA** quando um módulo de destino foi identificado. Se o nome/número do módulo não puder ser identificado com segurança, o conteúdo não é alterado e o Datrics pede que o usuário esclareça o destino.
+
+
+## IDE prática de SQL e Python
+
+A página **Dados → Limpeza de dados** oferece uma missão prática com banco SQLite persistente durante a sessão, editor com realce de sintaxe e numeração de linhas, execução de SQL (SELECT/UPDATE/DELETE/INSERT), execução de Python/pandas em Web Worker isolado, visualização tabular dos resultados e aplicação explícita do DataFrame ao conjunto de dados. A apostila também inclui um desafio de Python com testes objetivos executáveis, além da avaliação opcional por IA.
+
+**Limite técnico importante:** o navegador executa SQLite e Python/pandas localmente; isso não é um cluster Apache Spark/Databricks real. PySpark distribuído exige conexão com um workspace e compute/SQL Warehouse. O editor usa CodeMirror por CDN e mantém fallback em textarea se a CDN estiver indisponível.
