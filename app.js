@@ -2172,7 +2172,7 @@ function ligarMapa(raiz) {
     armazem.gravar(K.mapaChat, MAPA_CHAT); desenharChatMapa(raiz);
     $("#mmChatInput", raiz).value = "";
     const b = $("#mmGerar", raiz); b.disabled = true; b.setAttribute("aria-busy", "true");
-    st.className = "status"; st.textContent = "Entendendo seu pedido; vou pesquisar fontes na web antes de montar o mapa…";
+    st.className = "status"; st.textContent = "Entendendo seu pedido; a pesquisa na web será usada quando estiver disponível…";
     try {
       const r = await App.ia.mapaMental({ pedido, tema: pedido.slice(0, 100), foco: "Conceitos, relações, aplicações e exemplos", ramos: 8, sub: 5, mapaAtual: MAPA_ATUAL, aoStatus: (t) => st.textContent = t });
       MAPA_ATUAL = { ...r.mapa, sources: (r.fontes || []).map((f) => ({ title: f.titulo, url: f.url, snippet: f.texto })) };
@@ -2180,7 +2180,11 @@ function ligarMapa(raiz) {
       mostrarMapa(palco, MAPA_ATUAL);
       desenharFontesMapa(raiz, MAPA_ATUAL.sources);
       $("#mmMapaInfo", raiz).textContent = r.mapa.root;
-      const resposta = (r.nota ? r.nota + " " : "") + (MAPA_CHAT.length > 2 && MAPA_ATUAL ? "Mapa atualizado: " : "Mapa criado: ") + r.mapa.root + ". Organizei " + r.mapa.branches.length + " ramificações com explicações, usando " + (r.fontes || []).length + " fontes consultadas na web. Os links estão abaixo do mapa. Você pode pedir para aprofundar, corrigir ou reorganizar qualquer parte.";
+      const qtdFontes = (r.fontes || []).length;
+      const baseResposta = qtdFontes
+        ? " com apoio de " + qtdFontes + " fonte(s) consultada(s) na web"
+        : " usando conhecimento geral da IA, pois a pesquisa na web não retornou fontes acessíveis";
+      const resposta = (r.nota ? r.nota + " " : "") + (MAPA_CHAT.length > 2 && MAPA_ATUAL ? "Mapa atualizado: " : "Mapa criado: ") + r.mapa.root + ". Organizei " + r.mapa.branches.length + " ramificações com explicações" + baseResposta + ". Você pode pedir para aprofundar, corrigir ou reorganizar qualquer parte.";
       MAPA_CHAT.push({ role: "assistant", text: resposta });
       st.textContent = "Mapa pronto. Se quiser, peça alterações aqui no chat.";
     } catch (err) {

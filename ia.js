@@ -439,16 +439,23 @@ function lerMapa(texto, raiz) {
   if (!m) throw new Error("Não foi possível aproveitar nenhuma ramificação da resposta.");
   return { mapa: m, parcial: true };
 }
+function assuntoLimpoMapa(tema, pedido, mapaAtual) {
+  const texto = String(pedido || tema || "").replace(/\s+/g, " ").trim();
+  const semComando = texto
+    .replace(/^(?:por favor[, ]*)?(?:crie|criar|faça|faca|monte|gerar|gere|elabore|construa)\s+(?:um|uma)?\s*(?:mapa mental|mapa)\s*(?:sobre|de|do|da|dos|das|a respeito de)?\s*/i, "")
+    .replace(/^(?:mapa mental|mapa)\s+(?:sobre|de|do|da|dos|das)\s+/i, "")
+    .replace(/[.!?]+$/, "").trim();
+  if (semComando && semComando.length > 1) return semComando.slice(0, 120);
+  if (mapaAtual && mapaAtual.root && !/^(?:crie|criar|faça|faca|monte|gerar)\b/i.test(texto)) return String(mapaAtual.root).slice(0, 120);
+  return String(tema || texto || "Tema solicitado").slice(0, 120);
+}
 async function pesquisarFontesMapa(tema, pedido, mapaAtual, sinal, aoStatus) {
-  aoStatus?.("Pesquisando fontes na web antes de criar o mapa…");
-  const pedidoLimpo = String(pedido || "").replace(/\s+/g, " ").trim();
-  const pedidoNovo = /\b(crie|criar|faça|faca|monte|gerar|novo mapa|outro mapa|mapa sobre)\b/i.test(pedidoLimpo);
-  const assunto = String((pedidoNovo ? tema : (mapaAtual && mapaAtual.root)) || tema || pedido || "").trim();
+  const assunto = assuntoLimpoMapa(tema, pedido, mapaAtual);
+  aoStatus?.("Buscando referências na web (opcional)…");
   const consultas = [
     (assunto + " conceitos principais explicação").trim(),
-    (assunto + " documentação oficial fundamentos").trim(),
-    (pedidoLimpo.length > 8 ? pedidoLimpo : assunto).slice(0, 180)
-  ].filter((q, i, a) => q && a.indexOf(q) === i);
+    (assunto + " documentação oficial fundamentos").trim()
+  ];
   const resultados = [];
   for (const q of consultas) {
     if (sinal?.aborted) throw Object.assign(new Error("Pesquisa cancelada."), { aborto: true });
@@ -462,7 +469,8 @@ async function pesquisarFontesMapa(tema, pedido, mapaAtual, sinal, aoStatus) {
     } catch (e) { if (sinal?.aborted) throw e; }
     if (resultados.length >= 10) break;
   }
-  if (!resultados.length) throw new Error("Não encontrei fontes acessíveis na web para este assunto. Para evitar informações sem verificação, não criei o mapa. Tente outro termo ou tente novamente mais tarde.");
+  // A pesquisa é complementar. Se a web falhar, a IA ainda cria mapas de assuntos
+  // gerais usando conhecimento consolidado, sem inventar links nem alegar pesquisa.
   return resultados.slice(0, 10);
 }
 function contextoFontesMapa(fontes) {
@@ -471,18 +479,21 @@ function contextoFontesMapa(fontes) {
     "\n\nREGRAS DE CONFIABILIDADE: priorize documentação oficial e fontes primárias quando disponíveis; se as fontes forem insuficientes ou divergentes, sinalize a incerteza no subtópico em vez de adivinhar; não apresente inferências como fatos; não invente fontes ou links. Inclua marcadores [1], [2] nos subtópicos que dependam dessas fontes.";
 }
 async function mapaMental({ tema, foco, ramos = 8, sub = 5, pedido = "", mapaAtual = null, aoStatus, signal }) {
-  const fontes = await pesquisarFontesMapa(tema, pedido, mapaAtual, signal, aoStatus);
-  const contextoWeb = contextoFontesMapa(fontes);
+  const assunto = assuntoLimpoMapa(tema, pedido, mapaAtual);
+  const fontes = await pesquisarFontesMapa(assunto, pedido, mapaAtual, signal, aoStatus);
+  const contextoWeb = fontes.length
+    ? contextoFontesMapa(fontes)
+    : "PESQUISA WEB INDISPONÍVEL NESTA SOLICITAÇÃO. Crie o mapa usando conhecimento geral consolidado sobre o assunto. Não invente estatísticas, datas, versões, links ou citações. Para detalhes que mudam com o tempo, sinalize que devem ser confirmados na documentação oficial.";
   const sis = 'Retorne exclusivamente um objeto JSON válido, sem markdown e sem comentários, no formato {"root":"texto","branches":[{"name":"texto","children":["texto"]}]}. Não inclua propriedades adicionais. Cada children deve conter frases explicativas completas, não palavras soltas. Use exclusivamente fatos sustentados pelas fontes de pesquisa fornecidas; não invente informações.';
   const contextoAtual = mapaAtual ? "\nMAPA ATUAL PARA REVISÃO (preserve os pontos corretos e aplique o pedido do usuário):\n" + JSON.stringify(mapaAtual) : "";
-  const instrucao = pedido || ("Crie um mapa mental sobre " + tema + ".");
+  const instrucao = pedido || ("Crie um mapa mental sobre " + assunto + ".");
   const pedidoCompleto = "O usuário está conversando com um assistente especializado em criar mapas mentais visuais. Interprete o pedido em linguagem natural abaixo; não exija uma frase de comando específica.\n\nPEDIDO DO USUÁRIO:\n" + instrucao + contextoAtual + "\n\nCrie ou atualize um MAPA MENTAL EDITORIAL, detalhado e didático. Use como tema central um título curto e claro. Gere exatamente " + ramos + " ramificações principais, distribuídas de modo equilibrado, e até " + sub + " subtópicos por ramo. Se o usuário pedir quantidade diferente, respeite-a dentro desses limites. Cada subtópico deve ser uma explicação específica de 12 a 24 palavras, com conceito, finalidade, relação, aplicação ou exemplo concreto. Não use rótulos genéricos, palavras soltas ou lorem ipsum. Organize os ramos em sequência pedagógica, sem repetição. Se for uma solicitação de alteração do mapa existente, mantenha o conteúdo relevante e faça a mudança solicitada sem descartar informações úteis. Se o usuário pedir um novo tema, crie um mapa novo. Responda em português do Brasil.\n" + App.instrucaoNivel() + "\n\n" + contextoWeb;
   const r = await pedir({ rotulo: "Mapa mental", json: true, max_tokens: tokensMapa(ramos, sub), system: sis, messages: [{ role: "user", content: pedidoCompleto }], signal });
-  let { mapa, parcial } = lerMapa(r, tema); let nota = "";
+  let { mapa, parcial } = lerMapa(r, assunto); let nota = "";
   for (let rodada = 0; parcial && mapa.branches.length < ramos && rodada < 2; rodada++) {
     const falta = ramos - mapa.branches.length; aoStatus?.("Completando " + falta + " ramificação(ões) que faltaram…");
     try {
-      const r2 = await pedir({ rotulo: "Mapa mental (complemento)", json: true, max_tokens: tokensMapa(falta, sub), system: sis, messages: [{ role: "user", content: "Complete o mapa sobre " + tema + " com exatamente " + falta + " ramificações adicionais e " + sub + " explicações específicas por ramo. Não repita estes ramos: " + mapa.branches.map((b) => b.name).join("; ") + ". Retorne o mesmo formato JSON.\n\n" + contextoWeb }], signal });
+      const r2 = await pedir({ rotulo: "Mapa mental (complemento)", json: true, max_tokens: tokensMapa(falta, sub), system: sis, messages: [{ role: "user", content: "Complete o mapa sobre " + assunto + " com exatamente " + falta + " ramificações adicionais e " + sub + " explicações específicas por ramo. Não repita estes ramos: " + mapa.branches.map((b) => b.name).join("; ") + ". Retorne o mesmo formato JSON.\n\n" + contextoWeb }], signal });
       const extra = lerMapa(r2, tema); const vistos = new Set(mapa.branches.map((b) => b.name.toLowerCase()));
       extra.mapa.branches.forEach((b) => { if (!vistos.has(b.name.toLowerCase()) && mapa.branches.length < ramos) { mapa.branches.push(b); vistos.add(b.name.toLowerCase()); } });
       parcial = extra.parcial;
@@ -683,7 +694,22 @@ const limpaQ = (qs) => qs.map((q) => { const c = Object.assign({}, q); delete c.
 function publicar(t) {
   const antes = clone(S.mods); const c = t.cfg; let alvo;
   try {
-    if (t.kind === "tutor-questions" && t.aulaId && App.acharAula(t.aulaId)) {
+    /* Pedidos direcionados a um módulo existente nunca criam um módulo auxiliar. */
+    if (t.kind === "tutor-questions" && t.targetModuleTitle) {
+      let m = Number.isInteger(t.targetModuleIndex) ? S.mods[t.targetModuleIndex] : null;
+      if (!m || normCmp(m.t) !== normCmp(t.targetModuleTitle)) m = S.mods.find((x) => normCmp(x.t) === normCmp(t.targetModuleTitle));
+      if (!m) throw new Error('O módulo de destino "' + t.targetModuleTitle + '" não existe mais.');
+      alvo = t.targetLessonId ? m.l.find((l) => l.id === t.targetLessonId) : null;
+      if (!alvo && m.l.length) alvo = m.l[0];
+      if (!alvo) {
+        alvo = { id: App.idAulaUnico(m.t + " questões adicionais"), t: "Questões adicionais", d: Math.max(5, t.partes[0].all.length * 2) + " min", h: "Questões adicionadas ao módulo " + m.t + " a pedido do usuário.", q: [], studyCards: [] };
+        m.l.push(alvo);
+      }
+      alvo.q = Array.isArray(alvo.q) ? alvo.q : [];
+      alvo.q.push(...limpaQ(t.partes[0].all));
+      if (t.partes[0].cards?.length) alvo.studyCards = (alvo.studyCards || []).concat(t.partes[0].cards);
+      t.destinationModuleTitle = m.t; t.destinationLessonTitle = alvo.t;
+    } else if (t.kind === "tutor-questions" && t.aulaId && App.acharAula(t.aulaId)) {
       alvo = App.acharAula(t.aulaId); alvo.q.push(...limpaQ(t.partes[0].all));
       if (t.partes[0].cards?.length) alvo.studyCards = (alvo.studyCards || []).concat(t.partes[0].cards);
     } else if (t.kind === "tutor-study-lesson" && t.modulo) {
@@ -814,7 +840,7 @@ function ocupar(sim) { const p = $('[data-dt="parar"]'); if (p) p.hidden = !sim;
 
 /* Interpreta o pedido: criar conteúdo, criar questões, editar o site ou só conversar. */
 const RX = {
-  criar: /\b(crie|criar|criando|gere|gerar|gerando|elabore|elaborar|monte|montar|adicione|adicionar|fa[cç]a|produza|produzir|prepare|preparar)\b/i,
+  criar: /\b(crie|criar|criando|gere|gerar|gerando|elabore|elaborar|monte|montar|adicion\w*|inclua|incluir|incluindo|acrescente|acrescentar|acrescentando|insira|inserir|coloque|colocar|fa[cç]a|produza|produzir|prepare|preparar)\b/i,
   questoes: /\b(quest(?:ão|ao|ões|oes)|exerc[ií]cios?|desafios?)\b/i,
   conteudo: /\b(m[oó]dulos?|unidades?|trilhas?|cap[ií]tulos?|aulas?|material de estudo|cards? explicativos?|conte[uú]do did[aá]tico)\b/i,
   modulo: /\b(m[oó]dulos?|unidades?|trilhas?|cap[ií]tulos?)\b/i,
@@ -831,9 +857,35 @@ function extrairTema(t) {
 function quantidade(t, padrao) { const m = t.match(/(\d{1,2})\s*(?:\w+\s+)?(?:quest|exerc|desaf)/i) || t.match(/(?:quest\S*|exerc\S*|desaf\S*)\D{0,12}(\d{1,2})/i); return Math.min(25, Math.max(1, m ? Number(m[1]) : padrao)); }
 const dificuldade = (t) => /f[aá]c/i.test(t) ? "Fácil" : /dif[ií]c/i.test(t) ? "Difícil" : "Médio";
 const linguagem = (t) => /pyspark/i.test(t) ? "PySpark" : /python|pandas|numpy|matplotlib|jupyter/i.test(t) ? "Python" : /\bsql\b/i.test(t) ? "SQL" : "Misto";
+function moduloMencionado(t) {
+  const n = normCmp(t);
+  if (!n) return null;
+  /* Primeiro, exige correspondência pelo nome completo do módulo. */
+  const exatos = S.mods.map((m, i) => ({ m, i, nome: normCmp(m.t) })).filter((x) => x.nome && n.includes(x.nome)).sort((a, b) => b.nome.length - a.nome.length);
+  if (exatos.length) return exatos[0].m;
+  /* Também aceita referência ordinal explícita: "módulo 3". */
+  const ordinal = String(t || "").match(/\bm[oó]dulo\s+(\d{1,2})\b/i);
+  if (ordinal) return S.mods[Number(ordinal[1]) - 1] || null;
+  return null;
+}
+function aulaMencionadaNoModulo(t, modulo) {
+  if (!modulo) return null;
+  const atual = App.aulaAtual();
+  if (atual && modulo.l.includes(atual)) return atual;
+  const n = normCmp(t);
+  const exata = modulo.l.filter((l) => normCmp(l.t) && n.includes(normCmp(l.t))).sort((a, b) => normCmp(b.t).length - normCmp(a.t).length)[0];
+  if (exata) return exata;
+  if (modulo.l.length === 1) return modulo.l[0];
+  /* Como questões pertencem a aulas, quando o usuário informa apenas o módulo
+     usamos a primeira aula como destino, em vez de criar um módulo novo. */
+  return modulo.l[0] || null;
+}
 function aulaMencionada(t) {
   const n = normTexto(t);
-  return App.aulas().find((l) => n.includes(normTexto(l.t)) || n.includes(l.id.replace(/[-_]/g, " ")) || normTexto(l.t).split(/\s+/).filter((w) => w.length >= 5).some((w) => n.includes(w))) || App.aulaAtual();
+  const todas = App.aulas();
+  const exata = todas.filter((l) => n.includes(normTexto(l.t)) || n.includes(l.id.replace(/[-_]/g, " "))).sort((a, b) => normTexto(b.t).length - normTexto(a.t).length)[0];
+  if (exata) return exata;
+  return App.aulaAtual();
 }
 
 async function enviar(texto) {
@@ -861,10 +913,20 @@ async function enviar(texto) {
   controleAtivo = null; ocupar(false); desenharConversa();
 }
 async function criarQuestoesChat(texto) {
-  const tema = extrairTema(texto); const aula = aulaMencionada(texto);
-  const cfg = { tema: tema.length >= 3 ? tema : aula ? aula.t : "Databricks em geral", dif: dificuldade(texto), tipo: "Misto", ling: linguagem(texto), extra: "", pegadinhas: /pegadinha/i.test(texto), cards: false };
-  const t = novoTrabalho("tutor-questions", cfg, [{ qtd: quantidade(texto, 5), all: [] }], { aulaId: aula?.id || "" });
+  const moduloAlvo = moduloMencionado(texto);
+  if (/\bm[oó]dulo\b/i.test(texto) && !moduloAlvo) {
+    const nomes = S.mods.map((m, i) => (i + 1) + ". " + m.t).join("; ");
+    return "Não consegui identificar com segurança o módulo indicado, então não alterei nenhum conteúdo. Módulos disponíveis: " + nomes + ". Informe o nome exato ou o número do módulo.";
+  }
+  const aula = moduloAlvo ? aulaMencionadaNoModulo(texto, moduloAlvo) : aulaMencionada(texto);
+  const tema = extrairTema(texto);
+  const cfg = { tema: tema.length >= 3 ? tema : aula ? aula.t : moduloAlvo ? moduloAlvo.t : "Databricks em geral", dif: dificuldade(texto), tipo: "Misto", ling: linguagem(texto), extra: "", pegadinhas: /pegadinha/i.test(texto), cards: false };
+  const extras = moduloAlvo
+    ? { targetModuleTitle: moduloAlvo.t, targetModuleIndex: S.mods.indexOf(moduloAlvo), targetLessonId: aula?.id || "", aulaId: aula?.id || "" }
+    : { aulaId: aula?.id || "" };
+  const t = novoTrabalho("tutor-questions", cfg, [{ qtd: quantidade(texto, 5), all: [] }], extras);
   const alvo = await executarTrabalho(t, statusChat, controleAtivo.signal);
+  if (moduloAlvo) return "Pronto: adicionei " + t.partes[0].all.length + " questão(ões) sobre **" + cfg.tema + "** ao módulo **" + moduloAlvo.t + "**, dentro da aula **" + alvo.t + "**. Nenhum módulo novo foi criado. [Abrir aula](#" + encodeURIComponent(alvo.id) + ").";
   return "Pronto: " + t.partes[0].all.length + " questão(ões) sobre **" + cfg.tema + "** em [" + alvo.t + "](#" + encodeURIComponent(alvo.id) + "). Elas aparecem no fim da aula.";
 }
 function tituloModuloDoPedido(texto) {
