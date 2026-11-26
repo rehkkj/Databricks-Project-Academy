@@ -117,35 +117,72 @@ const CONTEUDO_PADRAO = [
           {
             "p": "Qual é a ideia central de uma arquitetura Lakehouse?",
             "o": [
-              "Combinar flexibilidade de data lake com confiabilidade e gestão de warehouse.",
-              "Substituir todo armazenamento em nuvem por bancos locais.",
-              "Executar consultas apenas em memória, sem persistência.",
-              "Manter uma cópia isolada dos dados para cada equipe."
+              "Manter um data lake para dados brutos e copiar tudo para um warehouse separado.",
+              "Guardar todos os dados em um único banco relacional, com esquema rígido, fixo e definido antes da carga.",
+              "Unir a flexibilidade de um data lake com a confiabilidade e a gestão de um data warehouse.",
+              "Processar dados apenas em streaming, descartando o histórico depois da leitura."
             ],
-            "a": 0,
-            "e": "O Lakehouse busca unir armazenamento aberto e flexível com recursos de confiabilidade, governança e desempenho."
+            "a": 2,
+            "e": "O Lakehouse busca uma base aberta e flexível, com transações, governança e desempenho, sem exigir cópias separadas para cada ferramenta."
           },
           {
-            "p": "Qual recurso do Delta Lake ajuda a oferecer transações confiáveis sobre arquivos?",
+            "p": "Qual recurso do Delta Lake oferece transações ACID sobre arquivos guardados em object storage?",
             "o": [
-              "Log transacional da tabela.",
-              "Interface gráfica do notebook.",
-              "Cache do navegador.",
-              "Arquivo CSV de configuração do cluster."
+              "O log de transações, que registra cada commit feito na tabela.",
+              "O particionamento por data, que isola cada escrita em uma pasta própria.",
+              "O formato Parquet, que já garante atomicidade em qualquer escrita.",
+              "O cache em disco dos workers, que replica os arquivos entre os nós."
             ],
             "a": 0,
-            "e": "O log transacional registra alterações e permite controlar versões e concorrência."
+            "e": "Parquet e partições organizam os dados, mas é o log de transações que define quais arquivos formam cada versão e controla a concorrência."
           },
           {
-            "p": "Por que separar armazenamento e compute pode ser vantajoso?",
+            "p": "Uma equipe só precisa de mais processamento durante o fechamento do mês. Por que separar armazenamento e compute ajuda nesse caso?",
             "o": [
-              "Permite dimensionar custos e capacidade de cada camada de forma independente.",
-              "Obriga a duplicar os dados em todos os clusters.",
-              "Impede que diferentes equipes consultem a mesma tabela.",
-              "Elimina a necessidade de controlar permissões."
+              "Os dados são replicados para cada cluster, o que acelera as leituras.",
+              "O armazenamento cresce sozinho conforme o número de nós aumenta.",
+              "O compute deixa de precisar de permissão para ler as tabelas.",
+              "Permite aumentar o compute por alguns dias sem copiar nem mover os dados."
             ],
-            "a": 0,
-            "e": "Separar as camadas permite ajustar recursos de processamento sem mover os dados armazenados."
+            "a": 3,
+            "e": "Com as camadas separadas, o compute escala para cima e para baixo de forma independente, enquanto os dados continuam no mesmo lugar."
+          },
+          {
+            "mode": "code",
+            "language": "Python",
+            "p": "Desafio de código: reconstrua os arquivos ativos de uma tabela a partir do log de transações.",
+            "task": "Implemente arquivos_ativos(log, versao=None). O log é uma lista de commits; cada commit é uma lista de ações (\"add\", arquivo) ou (\"remove\", arquivo). Reaplique os commits do primeiro até o de índice versao (inclusive) e devolva a lista ORDENADA dos arquivos ainda ativos. Se versao for None, use o log inteiro. Isso é o princípio do time travel do Delta Lake.",
+            "starter": `log = [
+    [("add", "a.parquet"), ("add", "b.parquet")],
+    [("remove", "a.parquet"), ("add", "c.parquet")],
+    [("add", "d.parquet")],
+]
+
+def arquivos_ativos(log, versao=None):
+    # TODO: reaplique os commits e devolva os arquivos ativos, ordenados
+    return []
+
+print(arquivos_ativos(log))
+print(arquivos_ativos(log, 0))`,
+            "solution": `def arquivos_ativos(log, versao=None):
+    ultimo = len(log) - 1 if versao is None else versao
+    ativos = set()
+    for commit in log[:ultimo + 1]:
+        for acao, arquivo in commit:
+            if acao == "add":
+                ativos.add(arquivo)
+            elif acao == "remove":
+                ativos.discard(arquivo)
+    return sorted(ativos)`,
+            "tests": `assert callable(arquivos_ativos), 'Crie a função arquivos_ativos(log, versao=None)'
+log_t = [[("add", "a.parquet"), ("add", "b.parquet")], [("remove", "a.parquet"), ("add", "c.parquet")], [("add", "d.parquet")]]
+assert arquivos_ativos(log_t) == ['b.parquet', 'c.parquet', 'd.parquet'], 'Sem versao, reaplique o log inteiro'
+assert arquivos_ativos(log_t, 0) == ['a.parquet', 'b.parquet'], 'versao=0 usa só o primeiro commit'
+assert arquivos_ativos(log_t, 1) == ['b.parquet', 'c.parquet'], 'remove deve tirar o arquivo da lista'
+assert arquivos_ativos([]) == [], 'Log vazio não tem arquivos'
+print('5 verificações passaram.')`,
+            "e": "O log de transações é uma sequência de commits de add/remove. Reaplicar os commits até uma versão reconstrói o estado da tabela naquele ponto.",
+            "lv": "Prática de código · Python"
           }
         ],
         "studyCards": [
@@ -170,37 +207,67 @@ const CONTEUDO_PADRAO = [
         "h": "## Organização do trabalho\n\nO workspace reúne ativos usados no desenvolvimento e na operação de dados: notebooks, arquivos, consultas, dashboards, jobs e outros recursos. Ele facilita a colaboração, mas não deve ser confundido com o local físico onde todos os dados são armazenados.\n\nNotebooks combinam células de código, texto e resultados. Podem ser usados para exploração, desenvolvimento de pipelines, documentação e análises reproduzíveis.\n\n## O que é compute\n\nCompute é a capacidade de processamento usada para executar consultas e código. Dependendo da carga de trabalho, pode envolver clusters, SQL warehouses ou compute serverless, conforme os recursos habilitados no workspace.\n\nDimensione o compute conforme volume, concorrência, latência esperada e custo. Um recurso maior nem sempre resolve um pipeline mal otimizado.\n\n## Boas práticas com notebooks\n\n1. Divida o trabalho em etapas pequenas e nomeadas.\n2. Documente premissas, origem dos dados e resultado esperado.\n3. Evite credenciais fixas no código.\n4. Separe exploração interativa de tarefas recorrentes de produção.\n5. Encerre recursos interativos quando não forem mais necessários.\n\n## Exemplo de análise em notebook\n\n```python\nvendas = spark.table(\"comercial.gold.vendas\")\nresumo = vendas.groupBy(\"categoria\").sum(\"valor\")\ndisplay(resumo)\n```\n\nO notebook organiza a análise; a execução acontece no compute selecionado. O resultado pode ser compartilhado ou transformado em uma tarefa agendada.",
         "q": [
           {
-            "p": "Qual é a função de um workspace no Databricks?",
+            "p": "Qual é a função do workspace no Databricks?",
             "o": [
-              "Organizar ativos de trabalho, como notebooks, consultas e jobs.",
-              "Armazenar obrigatoriamente todos os arquivos de dados.",
-              "Substituir o armazenamento de objetos da nuvem.",
-              "Executar código sem qualquer recurso de processamento."
+              "Guardar fisicamente todas as tabelas e arquivos de dados da empresa.",
+              "Organizar notebooks, consultas, jobs e outros ativos de trabalho de uma equipe.",
+              "Executar o processamento distribuído das consultas e gerenciar o ciclo de vida do compute de cada equipe.",
+              "Aplicar permissões de acesso a dados em todas as contas da organização."
             ],
-            "a": 0,
-            "e": "O workspace organiza os ativos e a colaboração; os dados podem ficar em armazenamento separado."
+            "a": 1,
+            "e": "O workspace reúne e organiza os ativos de desenvolvimento e operação. Os dados ficam em armazenamento separado e o processamento roda no compute."
           },
           {
-            "p": "O que fornece capacidade para executar o código de um notebook?",
-            "o": [
-              "Compute configurado para a carga de trabalho.",
-              "O tema visual selecionado pelo usuário.",
-              "A lista de favoritos do navegador.",
-              "O nome do arquivo do notebook."
-            ],
-            "a": 0,
-            "e": "O compute fornece os recursos de CPU, memória e execução necessários."
+            "mode": "code",
+            "language": "Python",
+            "p": "Desafio de código: encontre credenciais escritas direto no código de um notebook.",
+            "task": "Implemente achar_segredos(codigo). Receba o texto do código e devolva a lista dos números de linha (começando em 1) em que uma variável com nome contendo password, senha, token, secret ou api_key (sem diferenciar maiúsculas) recebe um texto literal entre aspas. Atribuições que usam dbutils.secrets.get(...) NÃO são problema e não entram na lista.",
+            "starter": `codigo = 'import requests\\ntoken = "abc123"\\nsenha = dbutils.secrets.get("escopo", "senha")\\nAPI_KEY = \\'xyz\\'\\nnome = "Ana"'
+
+def achar_segredos(codigo):
+    # TODO: percorra as linhas e devolva os números das que expõem segredos
+    return []
+
+print(achar_segredos(codigo))`,
+            "solution": `import re
+
+def achar_segredos(codigo):
+    achados = []
+    padrao = r"^\\s*\\w*(password|senha|token|secret|api_key)\\w*\\s*=\\s*[\\"']"
+    for numero, linha in enumerate(codigo.splitlines(), start=1):
+        if re.search(padrao, linha, re.IGNORECASE):
+            achados.append(numero)
+    return achados`,
+            "tests": `assert callable(achar_segredos), 'Crie a função achar_segredos(codigo)'
+teste = 'import requests\\ntoken = "abc123"\\nsenha = dbutils.secrets.get("escopo", "senha")\\nAPI_KEY = \\'xyz\\'\\nnome = "Ana"\\npassword="123"'
+assert achar_segredos(teste) == [2, 4, 6], 'Esperado [2, 4, 6]: token, API_KEY e password com texto literal'
+assert achar_segredos('x = 1\\ny = "ok"') == [], 'Sem segredos deve devolver lista vazia'
+assert achar_segredos('SECRET_KEY = dbutils.secrets.get("a", "b")') == [], 'secrets.get não é segredo exposto'
+print('3 verificações passaram.')`,
+            "e": "Credenciais literais no código vazam por versionamento, cópias e logs. O padrão correto é ler de um secret scope ou de identidade gerenciada.",
+            "lv": "Prática de código · Python"
           },
           {
-            "p": "Qual prática é recomendada para notebooks usados em produção?",
+            "p": "Um notebook precisa executar uma consulta pesada. O que fornece CPU e memória para rodá-la?",
             "o": [
-              "Documentar etapas e evitar credenciais diretamente no código.",
-              "Manter senhas em células de texto para facilitar o acesso.",
-              "Executar manualmente sem monitoramento.",
-              "Misturar dados de teste e produção sem identificação."
+              "O workspace, que guarda o código e também o executa.",
+              "O catálogo de dados ao qual a tabela consultada pertence.",
+              "O repositório Git conectado ao notebook.",
+              "Um compute (cluster ou SQL warehouse) anexado ao notebook."
+            ],
+            "a": 3,
+            "e": "Notebook guarda o código; quem executa é o compute anexado, com os recursos de CPU, memória e runtime."
+          },
+          {
+            "p": "Qual prática é mais adequada para um notebook que roda em produção?",
+            "o": [
+              "Ler credenciais de um secret scope e documentar as etapas do processo.",
+              "Guardar o token em uma variável no topo para facilitar a manutenção.",
+              "Executar manualmente todos os dias para conferir cada resultado.",
+              "Usar o mesmo notebook em teste e produção, trocando apenas os dados."
             ],
             "a": 0,
-            "e": "Documentação, gestão segura de segredos e monitoramento tornam o trabalho mais confiável."
+            "e": "Segredos ficam em um mecanismo seguro, e o notebook de produção deve ser documentado, versionado, monitorado e separado do ambiente de teste."
           }
         ],
         "studyCards": [
@@ -225,37 +292,76 @@ const CONTEUDO_PADRAO = [
         "h": "## Do dado bruto ao dado confiável\n\nUm fluxo analítico transforma dados de origem em informação útil. Em uma plataforma Lakehouse, é comum organizar as etapas em camadas para separar ingestão, limpeza e disponibilização.\n\nO padrão Medallion usa três camadas conceituais:\n\n- **Bronze:** dados ingeridos com pouca transformação, preservando a origem.\n- **Silver:** dados limpos, tipados, deduplicados e integrados.\n- **Gold:** dados agregados ou modelados para consumo analítico e de negócio.\n\n## Responsabilidade de cada camada\n\nA camada Bronze ajuda a reprocessar dados e auditar a ingestão. Silver concentra regras de qualidade, padronização e integração. Gold oferece estruturas orientadas a indicadores, relatórios e aplicações.\n\nNem todo projeto precisa de exatamente três camadas físicas. O padrão é uma forma de organizar responsabilidades; adapte-o ao domínio, ao volume e aos requisitos.\n\n## Exemplo de fluxo\n\n```python\nbronze = spark.read.format(\"delta\").table(\"raw.vendas\")\nsilver = bronze.dropDuplicates([\"id_venda\"]).filter(\"valor >= 0\")\nsilver.write.format(\"delta\").mode(\"overwrite\").saveAsTable(\"trusted.vendas\")\n```\n\nEm produção, valide a estratégia de escrita, particionamento, histórico e reprocessamento antes de usar `overwrite`. Prefira operações incrementais quando o cenário exigir atualização contínua.",
         "q": [
           {
-            "p": "Qual é a principal finalidade da camada Bronze?",
+            "p": "Qual é a principal finalidade da camada Bronze na arquitetura Medallion?",
             "o": [
-              "Preservar dados ingeridos próximos da origem para rastreabilidade e reprocessamento.",
-              "Armazenar apenas indicadores finais para dashboards.",
-              "Conter exclusivamente dados já agregados por mês.",
-              "Substituir o catálogo de governança."
+              "Guardar apenas métricas já agregadas para alimentar dashboards.",
+              "Armazenar dados já limpos, deduplicados e com todas as regras de negócio aplicadas para consumo.",
+              "Conter somente amostras dos dados para testes de desempenho.",
+              "Preservar os dados ingeridos próximos da origem, permitindo auditoria e reprocessamento."
             ],
-            "a": 0,
-            "e": "Bronze preserva a ingestão original e facilita auditoria e reprocessamento."
+            "a": 3,
+            "e": "Bronze guarda o dado como chegou. Isso dá rastreabilidade e permite reconstruir Silver e Gold se uma regra mudar."
           },
           {
-            "p": "Em qual camada normalmente são aplicadas padronização e deduplicação?",
+            "p": "Uma tabela recebe pedidos duplicados e datas gravadas como texto. Em qual camada essa limpeza costuma acontecer?",
             "o": [
-              "Silver.",
-              "Gold exclusivamente.",
-              "Workspace.",
-              "Compute."
+              "Bronze, que deve corrigir tudo antes de gravar.",
+              "Silver, onde os dados são padronizados, tipados e deduplicados.",
+              "Gold, que corrige os dados a cada consulta de negócio.",
+              "Em nenhuma, pois a limpeza é feita pelo próprio dashboard."
             ],
-            "a": 0,
-            "e": "Silver concentra limpeza, padronização, tipagem e integração."
+            "a": 1,
+            "e": "Silver concentra limpeza, tipagem, deduplicação e integração. Bronze preserva o original e Gold entrega dados prontos para o negócio."
           },
           {
-            "p": "Qual camada costuma servir indicadores e análises de negócio?",
+            "mode": "code",
+            "language": "Python",
+            "p": "Desafio de código: construa uma tabela Gold com o total de vendas pagas por categoria.",
+            "task": "Implemente agregar_gold(vendas). Cada venda é um dicionário com categoria, valor e status. Some o valor apenas das vendas com status \"pago\", agrupando por categoria, arredonde o total para 2 casas e devolva uma lista de tuplas (categoria, total) ordenada do maior total para o menor. Em caso de empate, ordene pelo nome da categoria.",
+            "starter": `vendas = [
+    {"categoria": "Livros", "valor": 40.0, "status": "pago"},
+    {"categoria": "Games", "valor": 100.0, "status": "pago"},
+    {"categoria": "Livros", "valor": 25.5, "status": "cancelado"},
+    {"categoria": "Games", "valor": 19.9, "status": "pago"},
+]
+
+def agregar_gold(vendas):
+    # TODO: filtre as vendas pagas, agrupe por categoria e some
+    return []
+
+print(agregar_gold(vendas))`,
+            "solution": `def agregar_gold(vendas):
+    totais = {}
+    for venda in vendas:
+        if venda["status"] == "pago":
+            totais[venda["categoria"]] = totais.get(venda["categoria"], 0) + venda["valor"]
+    return sorted(((c, round(t, 2)) for c, t in totais.items()), key=lambda item: (-item[1], item[0]))`,
+            "tests": `assert callable(agregar_gold), 'Crie a função agregar_gold(vendas)'
+v = [
+    {"categoria": "A", "valor": 10.0, "status": "pago"},
+    {"categoria": "B", "valor": 5.5, "status": "pago"},
+    {"categoria": "A", "valor": 2.5, "status": "cancelado"},
+    {"categoria": "B", "valor": 4.5, "status": "pago"},
+    {"categoria": "C", "valor": 7.0, "status": "pago"},
+    {"categoria": "D", "valor": 99.0, "status": "cancelado"},
+]
+assert agregar_gold(v) == [("A", 10.0), ("B", 10.0), ("C", 7.0)], 'Some só vendas pagas; empate ordena por categoria'
+assert agregar_gold([]) == [], 'Lista vazia deve devolver lista vazia'
+assert agregar_gold([{"categoria": "X", "valor": 0.1, "status": "pago"}, {"categoria": "X", "valor": 0.2, "status": "pago"}]) == [("X", 0.3)], 'Arredonde o total para 2 casas'
+print('3 verificações passaram.')`,
+            "e": "A camada Gold entrega dados já agregados para consumo. Filtrar status e agrupar por categoria é o tipo de regra de negócio que vive nessa camada.",
+            "lv": "Prática de código · Python"
+          },
+          {
+            "p": "Qual camada costuma servir indicadores e tabelas prontas para análise de negócio?",
             "o": [
-              "Gold.",
-              "Bronze.",
-              "Diretório de checkpoint.",
-              "Log do cluster."
+              "Bronze, com o histórico bruto de cada fonte de dados.",
+              "Silver, com um registro por evento exatamente como chegou.",
+              "Gold, com dados modelados e agregados para consumo.",
+              "Checkpoint, com o estado de cada fluxo de ingestão."
             ],
-            "a": 0,
-            "e": "Gold reúne dados modelados ou agregados para consumo analítico."
+            "a": 2,
+            "e": "Gold reúne dados modelados ou agregados para dashboards, relatórios e análises."
           }
         ],
         "studyCards": [
@@ -285,37 +391,83 @@ const CONTEUDO_PADRAO = [
         "h": "## Como uma tabela Delta funciona\n\nDelta Lake é uma camada de armazenamento de tabelas que combina arquivos de dados, geralmente Parquet, com um log transacional. O log registra operações e metadados necessários para que leitores vejam uma versão consistente da tabela.\n\nEsse mecanismo dá suporte a transações ACID, histórico de versões, evolução de esquema e controle de concorrência. Os recursos disponíveis e as configurações recomendadas dependem da versão e do ambiente Databricks.\n\n## Operações de leitura e escrita\n\nÉ possível ler uma tabela Delta com Spark ou consultá-la com SQL. Ao escrever, escolha conscientemente entre append, overwrite e operações de atualização. `overwrite` substitui dados conforme o escopo configurado e pode causar perda se usado sem cuidado.\n\n```python\ndf = spark.read.format(\"delta\").load(\"/lake/vendas\")\ndf.write.format(\"delta\").mode(\"append\").saveAsTable(\"comercial.silver.vendas\")\n```\n\n## Histórico e recuperação\n\nO histórico permite inspecionar versões anteriores e apoiar auditoria ou recuperação. A retenção de arquivos e metadados precisa ser planejada: não presuma que uma versão antiga ficará disponível indefinidamente.\n\n## Quando usar Delta\n\nDelta é indicado para tabelas analíticas que precisam de escrita confiável, leituras consistentes e evolução controlada. Defina também chaves de negócio, regras de qualidade e política de retenção.",
         "q": [
           {
-            "p": "Qual componente registra as transações de uma tabela Delta?",
+            "p": "Qual componente define quais arquivos pertencem a cada versão de uma tabela Delta?",
             "o": [
-              "O transaction log da tabela.",
-              "O histórico do navegador.",
-              "O arquivo de configuração do tema.",
-              "A memória do driver, sem persistência."
+              "O transaction log (_delta_log), com os commits da tabela.",
+              "O metastore do workspace, que lista os arquivos Parquet de cada versão.",
+              "O nome da pasta de partição, que identifica a versão dos dados.",
+              "O esquema da tabela, que guarda o caminho de cada arquivo."
             ],
             "a": 0,
-            "e": "O transaction log registra as operações e metadados que definem as versões da tabela."
+            "e": "O _delta_log registra as operações de cada commit. É a partir dele que o Delta sabe quais arquivos compõem cada versão."
           },
           {
-            "p": "Qual modo de escrita adiciona novos registros sem substituir os existentes?",
+            "p": "Qual modo de escrita adiciona novas linhas sem apagar as que já existem na tabela?",
             "o": [
-              "append.",
-              "overwrite.",
-              "ignore sempre.",
-              "drop."
+              "overwrite, que substitui o conteúdo conforme o escopo da escrita.",
+              "ignore, que grava apenas se a tabela ainda não existir.",
+              "append, que acrescenta as linhas novas ao final da tabela.",
+              "errorifexists, que combina as linhas novas com as antigas por chave."
             ],
-            "a": 0,
-            "e": "append adiciona dados à tabela. É importante validar duplicidades e idempotência do processo."
+            "a": 2,
+            "e": "append acrescenta dados. overwrite substitui, ignore não faz nada se já existir e errorifexists falha. Nenhum deles faz merge por chave, que é papel do MERGE."
           },
           {
-            "p": "Por que usar overwrite exige cuidado?",
+            "p": "Por que é preciso cuidado ao usar overwrite em uma tabela Delta?",
             "o": [
-              "Porque pode substituir dados existentes conforme o escopo da escrita.",
-              "Porque sempre transforma a tabela em CSV.",
-              "Porque remove automaticamente todas as permissões.",
-              "Porque desativa o log transacional."
+              "Ele apaga o histórico de versões imediatamente, então o time travel deixa de funcionar na hora.",
+              "Pode substituir dados que deveriam ser preservados, dependendo do escopo da escrita.",
+              "Ele só pode ser usado em tabelas que não têm nenhuma partição.",
+              "Ele exige recriar a tabela com um novo esquema a cada execução."
             ],
-            "a": 0,
-            "e": "Uma sobrescrita mal configurada pode apagar dados que deveriam ser preservados."
+            "a": 1,
+            "e": "Um overwrite mal escopado troca dados que deveriam ficar. As versões antigas ainda existem até um VACUUM, mas o resultado corrente já estará errado."
+          },
+          {
+            "mode": "code",
+            "language": "Python",
+            "p": "Desafio de código: simule os modos de escrita append, overwrite, ignore e errorifexists.",
+            "task": "Implemente escrever(tabela, novas, modo). tabela é uma lista de linhas, ou None quando a tabela ainda não existe. Modos: \"append\" devolve tabela + novas; \"overwrite\" devolve só as novas; \"ignore\" devolve a tabela atual se ela existir, senão as novas; \"errorifexists\" levanta ValueError se a tabela existir, senão devolve as novas. Qualquer outro modo levanta ValueError. Nunca altere a lista original: devolva uma nova lista.",
+            "starter": `def escrever(tabela, novas, modo):
+    # TODO: trate cada modo de escrita
+    return tabela
+
+base = [1, 2]
+print(escrever(base, [3], "append"))
+print(escrever(base, [3], "overwrite"))`,
+            "solution": `def escrever(tabela, novas, modo):
+    existe = tabela is not None
+    if modo == "append":
+        return (list(tabela) if existe else []) + list(novas)
+    if modo == "overwrite":
+        return list(novas)
+    if modo == "ignore":
+        return list(tabela) if existe else list(novas)
+    if modo == "errorifexists":
+        if existe:
+            raise ValueError("A tabela já existe")
+        return list(novas)
+    raise ValueError("Modo inválido: " + str(modo))`,
+            "tests": `assert callable(escrever), 'Crie a função escrever(tabela, novas, modo)'
+base_t = [1, 2]
+assert escrever(base_t, [3], "append") == [1, 2, 3], 'append acrescenta ao final'
+assert base_t == [1, 2], 'Não altere a lista original'
+assert escrever(base_t, [3], "overwrite") == [3], 'overwrite substitui tudo'
+assert escrever(base_t, [3], "ignore") == [1, 2], 'ignore mantém a tabela existente'
+assert escrever(None, [3], "ignore") == [3], 'ignore grava se a tabela não existe'
+assert escrever(None, [3], "append") == [3], 'append em tabela inexistente cria com as novas'
+assert escrever(None, [3], "errorifexists") == [3], 'errorifexists grava se a tabela não existe'
+def _falha(tabela, modo):
+    try:
+        escrever(tabela, [3], modo)
+    except ValueError:
+        return True
+    return False
+assert _falha(base_t, "errorifexists"), 'errorifexists deve levantar ValueError se a tabela existe'
+assert _falha(base_t, "upsert"), 'Modo desconhecido deve levantar ValueError'
+print('9 verificações passaram.')`,
+            "e": "Cada modo de escrita tem um contrato diferente. Conhecer esse contrato evita apagar dados com overwrite ou duplicar registros com append.",
+            "lv": "Prática de código · Python"
           }
         ],
         "studyCards": [
@@ -340,37 +492,66 @@ const CONTEUDO_PADRAO = [
         "h": "## Consultar dados com SQL\n\nSpark SQL permite consultar tabelas e views usando uma linguagem familiar para análise. Em Databricks, as consultas podem ser executadas em notebooks, no SQL editor e em tarefas automatizadas.\n\nUma referência de tabela no Unity Catalog normalmente usa três partes: `catalogo.esquema.tabela`. Essa forma deixa explícita a localização lógica do objeto.\n\n## Estrutura de uma consulta\n\n```sql\nSELECT categoria, SUM(valor) AS total_vendas\nFROM comercial.gold.vendas\nWHERE data_venda >= DATE '2026-01-01'\nGROUP BY categoria\nORDER BY total_vendas DESC;\n```\n\n`SELECT` define as colunas ou expressões retornadas; `FROM` indica a origem; `WHERE` filtra linhas; `GROUP BY` agrega; `ORDER BY` ordena o resultado.\n\n## Joins e agregações\n\nUse joins para combinar tabelas relacionadas. Antes de combinar, entenda a cardinalidade das chaves: uma relação um-para-muitos pode multiplicar linhas e alterar somas. Confira contagens e valores antes e depois do join.\n\n## Consultas eficientes\n\nEvite `SELECT *` em tabelas largas quando só algumas colunas são necessárias. Filtre o quanto antes, verifique o plano de execução e use estatísticas e particionamento quando fizer sentido. Otimização deve ser orientada por métricas, não apenas por regras genéricas.",
         "q": [
           {
-            "p": "Qual cláusula filtra linhas antes da agregação?",
+            "p": "Qual cláusula descarta linhas individuais ANTES de os grupos serem formados?",
             "o": [
-              "WHERE.",
-              "ORDER BY.",
-              "AS.",
-              "LIMIT BY."
+              "HAVING, que descarta linhas antes de formar os grupos.",
+              "WHERE, que filtra as linhas antes do GROUP BY.",
+              "ORDER BY, que remove as linhas fora da faixa informada.",
+              "LIMIT, que filtra as linhas pelo valor de uma coluna."
             ],
-            "a": 0,
-            "e": "WHERE aplica condições às linhas antes do agrupamento."
+            "a": 1,
+            "e": "WHERE atua nas linhas antes da agregação. HAVING filtra os grupos já agregados, ORDER BY ordena e LIMIT corta a quantidade."
           },
           {
-            "p": "Qual cláusula reúne registros para calcular agregações por categoria?",
-            "o": [
-              "GROUP BY.",
-              "ORDER BY.",
-              "FROM.",
-              "DISTINCT ON."
-            ],
-            "a": 0,
-            "e": "GROUP BY agrupa linhas com valores correspondentes para funções como SUM e COUNT."
+            "mode": "code",
+            "language": "Python",
+            "p": "Desafio de código: simule em Python um SELECT com WHERE, GROUP BY, HAVING e ORDER BY.",
+            "task": "Implemente consulta(linhas, minimo, limite_total). linhas é uma lista de tuplas (categoria, valor). Equivale a: SELECT categoria, SUM(valor) AS total FROM t WHERE valor >= minimo GROUP BY categoria HAVING SUM(valor) > limite_total ORDER BY total DESC. Devolva uma lista de tuplas (categoria, total); em empate de total, ordene pela categoria.",
+            "starter": `linhas = [("A", 50), ("A", 70), ("B", 30), ("B", 40), ("C", 200), ("A", 5)]
+
+def consulta(linhas, minimo, limite_total):
+    # TODO: WHERE -> GROUP BY -> HAVING -> ORDER BY
+    return []
+
+print(consulta(linhas, 10, 100))`,
+            "solution": `def consulta(linhas, minimo, limite_total):
+    totais = {}
+    for categoria, valor in linhas:
+        if valor >= minimo:
+            totais[categoria] = totais.get(categoria, 0) + valor
+    filtrados = [(c, t) for c, t in totais.items() if t > limite_total]
+    return sorted(filtrados, key=lambda item: (-item[1], item[0]))`,
+            "tests": `assert callable(consulta), 'Crie a função consulta(linhas, minimo, limite_total)'
+dados = [("A", 50), ("A", 70), ("B", 30), ("B", 40), ("C", 200), ("A", 5)]
+assert consulta(dados, 10, 100) == [("C", 200), ("A", 120)], 'WHERE tira ("A", 5) e HAVING tira B (70)'
+assert consulta(dados, 0, 100) == [("C", 200), ("A", 125)], 'Com minimo=0 o valor 5 entra no total de A'
+assert consulta(dados, 60, 60) == [("C", 200), ("A", 70)], 'O HAVING usa a soma depois do WHERE'
+assert consulta([], 0, 0) == [], 'Sem linhas, resultado vazio'
+print('4 verificações passaram.')`,
+            "e": "WHERE reduz as linhas antes da agregação; HAVING filtra os grupos depois. Trocar a ordem muda o resultado, como os testes mostram.",
+            "lv": "Prática de código · Python"
           },
           {
-            "p": "O que deve ser verificado antes de combinar duas tabelas com JOIN?",
+            "p": "Para obter o total de vendas por categoria, qual construção agrupa as linhas antes de aplicar SUM?",
             "o": [
-              "A cardinalidade e a unicidade das chaves de relacionamento.",
-              "A cor do tema do notebook.",
-              "A ordem alfabética dos nomes dos arquivos.",
-              "A quantidade de células no notebook."
+              "GROUP BY categoria, que colapsa as linhas de cada categoria em uma só.",
+              "PARTITION BY categoria, que mantém todas as linhas e repete o total em cada uma.",
+              "ORDER BY categoria, que soma as linhas conforme a sequência da tabela.",
+              "DISTINCT categoria, que soma apenas os valores sem repetição."
             ],
             "a": 0,
-            "e": "A cardinalidade determina quantas linhas podem resultar do join e pode multiplicar registros."
+            "e": "GROUP BY gera uma linha por grupo. PARTITION BY é usado em funções de janela e preserva as linhas originais."
+          },
+          {
+            "p": "O que verificar antes de unir duas tabelas com JOIN para não inflar o resultado?",
+            "o": [
+              "Se as duas tabelas têm o mesmo número de colunas.",
+              "Se as duas tabelas estão guardadas no mesmo catálogo e no mesmo schema do metastore.",
+              "Se a coluna de junção está ordenada de forma crescente.",
+              "Se a chave é única na tabela de dimensão, para não multiplicar linhas."
+            ],
+            "a": 3,
+            "e": "Chaves repetidas no lado \"um\" do relacionamento multiplicam as linhas. Cardinalidade e unicidade devem ser conferidas antes do JOIN."
           }
         ],
         "studyCards": [
@@ -395,37 +576,84 @@ const CONTEUDO_PADRAO = [
         "h": "## Atualizações incrementais\n\nPipelines de dados frequentemente recebem registros novos e alterações de registros existentes. O comando `MERGE INTO` permite combinar uma origem com uma tabela de destino usando uma condição de correspondência.\n\n```sql\nMERGE INTO comercial.silver.clientes AS destino\nUSING atualizacao_clientes AS origem\nON destino.id_cliente = origem.id_cliente\nWHEN MATCHED THEN UPDATE SET *\nWHEN NOT MATCHED THEN INSERT *;\n```\n\nA condição `ON` deve refletir a chave de negócio. Se a origem tiver várias linhas para a mesma chave, a operação pode ser ambígua; deduplique ou defina uma regra antes do merge.\n\n## Evolução de esquema\n\nEvolução de esquema permite adaptar a estrutura da tabela quando novas colunas ou mudanças são esperadas. Habilite esse comportamento de forma consciente e documente contratos de dados. Aceitar qualquer alteração automaticamente pode esconder incompatibilidades entre produtores e consumidores.\n\n## Histórico de versões\n\nO histórico Delta ajuda a entender operações realizadas e versões disponíveis. Use-o para auditoria e investigação. A recuperação de versões depende das políticas de retenção e da disponibilidade dos arquivos correspondentes.\n\n## Boas práticas\n\n- Defina uma chave estável para identificar registros.\n- Torne a ingestão idempotente sempre que possível.\n- Registre contagens de inserções, atualizações e rejeições.\n- Teste alterações de esquema em ambiente controlado.",
         "q": [
           {
-            "p": "Para que serve o comando MERGE INTO em Delta Lake?",
+            "p": "Para que serve o comando MERGE INTO em uma tabela Delta?",
             "o": [
-              "Aplicar inserções e atualizações com base em uma condição de correspondência.",
-              "Criar um notebook automaticamente.",
-              "Excluir o transaction log.",
-              "Converter SQL em Python sem executar consulta."
+              "Unir arquivos pequenos em arquivos maiores para acelerar as leituras.",
+              "Combinar duas tabelas em um novo notebook sem alterar o destino.",
+              "Mesclar versões antigas da tabela em uma só, descartando o histórico e liberando espaço em disco.",
+              "Atualizar linhas correspondentes e inserir as novas em uma única operação transacional."
             ],
-            "a": 0,
-            "e": "MERGE combina registros da origem com o destino, permitindo atualizar correspondências e inserir novos registros."
+            "a": 3,
+            "e": "MERGE compara origem e destino por uma condição, atualiza o que casa e insere o que é novo. Compactar arquivos pequenos é papel do OPTIMIZE."
           },
           {
-            "p": "O que deve ser garantido na origem antes de um MERGE por chave?",
+            "p": "Antes de executar um MERGE por chave, o que a origem precisa garantir?",
             "o": [
-              "Que não existam múltiplas linhas conflitantes para a mesma chave, ou que haja regra explícita para resolvê-las.",
-              "Que todas as colunas tenham nomes com uma letra.",
-              "Que a tabela de destino esteja vazia.",
-              "Que o notebook esteja em modo escuro."
+              "Que as colunas estejam em ordem alfabética.",
+              "Que a tabela de destino esteja vazia e sem partições, para evitar qualquer conflito de escrita.",
+              "Que cada chave apareça uma só vez ou que exista regra clara para resolver conflitos.",
+              "Que a origem seja uma tabela Delta, e não uma view."
             ],
-            "a": 0,
-            "e": "Duplicidades na origem podem tornar a correspondência ambígua e causar falhas ou resultados incorretos."
+            "a": 2,
+            "e": "Várias linhas de origem para a mesma chave tornam a correspondência ambígua e podem causar erro ou resultado incorreto."
           },
           {
-            "p": "Qual é um risco de permitir evolução de esquema sem governança?",
+            "mode": "code",
+            "language": "Python",
+            "p": "Desafio de código: implemente um upsert (MERGE) por chave sobre listas de dicionários.",
+            "task": "Implemente merge(destino, origem, chave). Para cada linha da origem: se a chave já existir no destino, atualize os campos dessa linha com os valores da origem; se não existir, insira a linha no final. Se a origem tiver a mesma chave mais de uma vez, levante ValueError. Preserve a ordem do destino e NÃO altere as listas originais.",
+            "starter": `destino = [{"id": 1, "nome": "Ana", "saldo": 10}, {"id": 2, "nome": "Bia", "saldo": 20}]
+origem = [{"id": 2, "nome": "Bia", "saldo": 25}, {"id": 3, "nome": "Caio", "saldo": 5}]
+
+def merge(destino, origem, chave):
+    # TODO: valide chaves duplicadas, atualize as existentes e insira as novas
+    return destino
+
+print(merge(destino, origem, "id"))`,
+            "solution": `def merge(destino, origem, chave):
+    chaves = [linha[chave] for linha in origem]
+    if len(chaves) != len(set(chaves)):
+        raise ValueError("A origem tem chaves duplicadas")
+    por_chave = {linha[chave]: linha for linha in origem}
+    resultado, usadas = [], set()
+    for linha in destino:
+        k = linha[chave]
+        if k in por_chave:
+            resultado.append({**linha, **por_chave[k]})
+            usadas.add(k)
+        else:
+            resultado.append(dict(linha))
+    for linha in origem:
+        if linha[chave] not in usadas:
+            resultado.append(dict(linha))
+    return resultado`,
+            "tests": `assert callable(merge), 'Crie a função merge(destino, origem, chave)'
+d = [{"id": 1, "nome": "Ana", "saldo": 10}, {"id": 2, "nome": "Bia", "saldo": 20}]
+o = [{"id": 2, "nome": "Bia", "saldo": 25}, {"id": 3, "nome": "Caio", "saldo": 5}]
+r = merge(d, o, "id")
+assert r == [{"id": 1, "nome": "Ana", "saldo": 10}, {"id": 2, "nome": "Bia", "saldo": 25}, {"id": 3, "nome": "Caio", "saldo": 5}], 'Atualize id 2 e insira id 3'
+assert d[1]["saldo"] == 20 and len(d) == 2, 'Não altere o destino original'
+assert merge(d, [], "id") == d, 'Origem vazia mantém o destino'
+try:
+    merge(d, [{"id": 9, "nome": "X", "saldo": 1}, {"id": 9, "nome": "Y", "saldo": 2}], "id")
+    falhou = False
+except ValueError:
+    falhou = True
+assert falhou, 'Chave duplicada na origem deve levantar ValueError'
+print('4 verificações passaram.')`,
+            "e": "MERGE é um upsert transacional. A validação de chaves duplicadas na origem evita correspondências ambíguas.",
+            "lv": "Prática de código · Python"
+          },
+          {
+            "p": "Qual risco existe ao permitir evolução de esquema sem governança?",
             "o": [
-              "Mudanças incompatíveis podem chegar aos consumidores sem validação.",
-              "A tabela deixa de armazenar dados em arquivos.",
-              "Todas as consultas passam a ser executadas no navegador.",
-              "O compute perde acesso à rede."
+              "Mudanças incompatíveis podem chegar a quem consome a tabela sem validação.",
+              "A tabela deixa de registrar novas versões no log.",
+              "As colunas antigas são apagadas automaticamente do histórico e dos arquivos já gravados.",
+              "As permissões de acesso são reiniciadas a cada alteração."
             ],
             "a": 0,
-            "e": "Contratos de dados e validações evitam que alterações inesperadas quebrem consumidores."
+            "e": "Contratos de dados e validações evitam que uma coluna nova ou alterada quebre dashboards e pipelines que dependem da tabela."
           }
         ],
         "studyCards": [
@@ -455,37 +683,103 @@ const CONTEUDO_PADRAO = [
         "h": "## DataFrames distribuídos\n\nPySpark é a interface Python para trabalhar com Apache Spark. Um DataFrame representa dados distribuídos em linhas e colunas e permite expressar transformações sem gerenciar manualmente cada partição.\n\nAs transformações mais comuns incluem `select`, `filter`, `withColumn`, `groupBy` e `join`. Em geral, essas operações retornam novos DataFrames, em vez de alterar o objeto original.\n\n```python\nfrom pyspark.sql import functions as F\n\nvendas = spark.table(\"comercial.silver.vendas\")\nresultado = (\n    vendas.filter(F.col(\"valor\") > 0)\n          .groupBy(\"categoria\")\n          .agg(F.sum(\"valor\").alias(\"total\"))\n)\ndisplay(resultado)\n```\n\n## Avaliação preguiçosa\n\nO Spark costuma construir um plano lógico quando você encadeia transformações. A execução ocorre quando uma ação, como `count`, `show`, `collect` ou `write`, precisa produzir um resultado.\n\nEvite `collect()` em conjuntos grandes: ele traz os dados para o processo driver e pode consumir memória excessiva. Prefira agregações distribuídas e amostras limitadas para inspeção.\n\n## Joins e particionamento\n\nJoins podem exigir movimentação de dados entre partições. Conheça o tamanho das tabelas, a distribuição das chaves e o plano de execução. Broadcast join pode ajudar quando uma das tabelas é pequena, mas deve ser usado com critério.\n\n## Código legível e reutilizável\n\nSepare transformações em etapas nomeadas, use funções de `pyspark.sql.functions` e evite UDFs quando operações nativas resolvem o problema. Funções nativas costumam permitir mais otimizações pelo Catalyst.",
         "q": [
           {
-            "p": "Qual das opções é uma ação que normalmente dispara a execução de um DataFrame?",
-            "o": [
-              "df.count().",
-              "df.select(\"categoria\").",
-              "df.filter(\"valor > 0\").",
-              "df.withColumn(\"ano\", F.year(\"data\"))."
-            ],
-            "a": 0,
-            "e": "count é uma ação. select, filter e withColumn são transformações que compõem o plano."
+            "mode": "code",
+            "language": "Python",
+            "p": "Desafio de código: construa um mini DataFrame com avaliação preguiçosa (lazy evaluation).",
+            "task": "Implemente a classe MiniDataFrame(linhas) com os métodos filter(cond), with_column(nome, fn), collect() e count(). filter e with_column NÃO executam nada: apenas devolvem um NOVO MiniDataFrame com o passo registrado no plano, sem alterar o original. collect() e count() são as ações: só elas aplicam o plano, na ordem, e devolvem as linhas (lista de dicionários) ou a quantidade.",
+            "starter": `class MiniDataFrame:
+    def __init__(self, linhas, plano=()):
+        self._linhas = list(linhas)
+        self._plano = tuple(plano)
+
+    def filter(self, cond):
+        # TODO: devolva um novo MiniDataFrame com o passo no plano
+        return self
+
+    def with_column(self, nome, fn):
+        # TODO: idem, para criar uma coluna
+        return self
+
+    def collect(self):
+        # TODO: aplique o plano e devolva as linhas
+        return []
+
+    def count(self):
+        return len(self.collect())
+
+df = MiniDataFrame([{"valor": 1}, {"valor": -2}, {"valor": 3}])
+print(df.filter(lambda l: l["valor"] > 0).count())`,
+            "solution": `class MiniDataFrame:
+    def __init__(self, linhas, plano=()):
+        self._linhas = list(linhas)
+        self._plano = tuple(plano)
+
+    def filter(self, cond):
+        return MiniDataFrame(self._linhas, self._plano + (("filter", cond),))
+
+    def with_column(self, nome, fn):
+        return MiniDataFrame(self._linhas, self._plano + (("coluna", (nome, fn)),))
+
+    def collect(self):
+        linhas = [dict(l) for l in self._linhas]
+        for tipo, arg in self._plano:
+            if tipo == "filter":
+                linhas = [l for l in linhas if arg(l)]
+            else:
+                nome, fn = arg
+                linhas = [{**l, nome: fn(l)} for l in linhas]
+        return linhas
+
+    def count(self):
+        return len(self.collect())`,
+            "tests": `assert 'MiniDataFrame' in globals(), 'Crie a classe MiniDataFrame'
+chamadas = []
+def _positivo(l):
+    chamadas.append(1)
+    return l["valor"] > 0
+base_df = MiniDataFrame([{"valor": 1}, {"valor": -2}, {"valor": 3}])
+df2 = base_df.filter(_positivo).with_column("dobro", lambda l: l["valor"] * 2)
+assert chamadas == [], 'Transformações são preguiçosas: nada pode executar antes de uma ação'
+assert df2.count() == 2, 'count() deve aplicar o plano e contar 2 linhas'
+assert len(chamadas) == 3, 'A condição deve rodar uma vez por linha quando a ação é chamada'
+assert df2.collect() == [{"valor": 1, "dobro": 2}, {"valor": 3, "dobro": 6}], 'collect() devolve as linhas transformadas'
+assert len(base_df.collect()) == 3, 'O DataFrame original não pode ser alterado (imutabilidade)'
+print('5 verificações passaram.')`,
+            "e": "No Spark, transformações apenas montam um plano e as ações o executam. A imutabilidade permite ao otimizador reorganizar o plano antes de rodar.",
+            "lv": "Prática de código · Python"
           },
           {
-            "p": "Por que collect() deve ser usado com cuidado em grandes DataFrames?",
+            "p": "Qual das opções é uma ação que normalmente dispara a execução de um DataFrame?",
             "o": [
-              "Porque traz os registros para a memória do driver.",
-              "Porque remove as colunas do DataFrame.",
-              "Porque transforma automaticamente dados em CSV.",
-              "Porque desativa o processamento distribuído de forma permanente."
+              "df.select(\"categoria\")",
+              "df.filter(\"valor > 0\")",
+              "df.count()",
+              "df.withColumn(\"ano\", F.year(\"data\"))"
             ],
-            "a": 0,
-            "e": "collect transfere os resultados para o driver e pode causar falta de memória."
+            "a": 2,
+            "e": "count() é uma ação e dispara o job. select, filter e withColumn são transformações preguiçosas que apenas montam o plano."
+          },
+          {
+            "p": "Por que collect() deve ser usado com cuidado em DataFrames grandes?",
+            "o": [
+              "Porque remove as partições do DataFrame original.",
+              "Porque traz todas as linhas para a memória do driver, que pode estourar.",
+              "Porque grava o resultado inteiro em disco, em um único arquivo, antes de devolvê-lo ao cliente.",
+              "Porque reexecuta o job uma vez para cada coluna."
+            ],
+            "a": 1,
+            "e": "collect() leva o resultado inteiro para um único processo, o driver. Em dados grandes, isso causa falta de memória."
           },
           {
             "p": "Qual prática costuma favorecer a otimização de consultas PySpark?",
             "o": [
-              "Preferir funções nativas do Spark quando atendem à transformação.",
-              "Converter todo DataFrame para lista Python no início.",
-              "Aplicar collect após cada transformação.",
-              "Criar uma UDF para qualquer operação simples."
+              "Converter o DataFrame em lista Python antes de filtrar.",
+              "Criar uma UDF Python para cada operação, mesmo as simples, para ter mais controle do código.",
+              "Chamar collect() depois de cada transformação para validar.",
+              "Preferir funções nativas do Spark, que o otimizador consegue planejar."
             ],
-            "a": 0,
-            "e": "Funções nativas são conhecidas pelo otimizador e evitam transferências desnecessárias para Python."
+            "a": 3,
+            "e": "Funções nativas são conhecidas pelo Catalyst e rodam na JVM, sem o custo de ida e volta para o Python."
           }
         ],
         "studyCards": [
@@ -512,35 +806,63 @@ const CONTEUDO_PADRAO = [
           {
             "p": "Qual é o principal objetivo do Auto Loader?",
             "o": [
-              "Detectar e ingerir arquivos novos de forma incremental.",
-              "Executar consultas SQL apenas em memória.",
-              "Criar automaticamente permissões de usuários.",
-              "Substituir todos os notebooks por dashboards."
+              "Detectar e ingerir de forma incremental os arquivos novos que chegam ao armazenamento.",
+              "Recarregar toda a pasta de origem a cada execução, relendo todos os arquivos para garantir a consistência.",
+              "Converter arquivos CSV em tabelas SQL sem precisar de compute.",
+              "Copiar tabelas Delta entre workspaces de forma automática."
             ],
             "a": 0,
-            "e": "Auto Loader automatiza a descoberta e a ingestão incremental de arquivos em armazenamento de nuvem."
+            "e": "O Auto Loader descobre arquivos novos e os processa de forma incremental, sem reler tudo a cada execução."
           },
           {
             "p": "Qual é a função do checkpoint em um fluxo de ingestão?",
             "o": [
-              "Persistir estado e permitir retomada do processamento.",
-              "Armazenar a senha do usuário em texto puro.",
-              "Substituir a tabela Delta de destino.",
-              "Guardar somente os gráficos do notebook."
+              "Armazenar uma cópia dos dados brutos de cada lote para consultas futuras e auditoria.",
+              "Validar o esquema de cada arquivo antes da leitura.",
+              "Definir quais usuários podem executar o fluxo.",
+              "Guardar o progresso do fluxo para retomar de onde parou após uma falha."
             ],
-            "a": 0,
-            "e": "O checkpoint mantém o estado da consulta e apoia a recuperação após falhas."
+            "a": 3,
+            "e": "O checkpoint mantém o estado do fluxo (o que já foi lido) e permite recuperação sem reprocessar nem perder dados."
           },
           {
             "p": "Onde deve ficar o checkpoint de um pipeline de produção?",
             "o": [
-              "Em um caminho persistente, controlado e exclusivo para a consulta.",
-              "Em uma pasta temporária apagada a cada execução.",
-              "Na pasta de downloads do navegador.",
-              "Dentro de uma célula Markdown do notebook."
+              "Em um diretório temporário do driver, recriado a cada execução.",
+              "Em uma pasta compartilhada por todos os fluxos da equipe.",
+              "Em um local persistente e exclusivo de cada fluxo de ingestão.",
+              "Dentro da própria pasta de origem dos arquivos lidos."
             ],
-            "a": 0,
-            "e": "O checkpoint precisa sobreviver a reinicializações e não deve ser compartilhado indevidamente entre consultas."
+            "a": 2,
+            "e": "O checkpoint precisa sobreviver a reinicializações e não deve ser compartilhado entre fluxos, para não misturar o estado de cada um."
+          },
+          {
+            "mode": "code",
+            "language": "Python",
+            "p": "Desafio de código: simule a ingestão incremental com checkpoint.",
+            "task": "Implemente ingerir_novos(listados, checkpoint). listados é a lista de nomes de arquivos hoje na pasta (pode ter repetidos) e checkpoint é a lista dos já processados. Devolva uma tupla (novos, checkpoint_atualizado): novos são os arquivos ainda não processados, sem repetição e ordenados; checkpoint_atualizado é a lista ordenada de todos os arquivos já processados. NÃO altere a lista checkpoint recebida.",
+            "starter": `def ingerir_novos(listados, checkpoint):
+    # TODO: descubra os arquivos novos e atualize o checkpoint
+    return [], checkpoint
+
+novos, ck = ingerir_novos(["a.json", "b.json", "c.json", "b.json"], ["a.json"])
+print(novos, ck)`,
+            "solution": `def ingerir_novos(listados, checkpoint):
+    processados = set(checkpoint)
+    novos = sorted(set(listados) - processados)
+    atualizado = sorted(processados | set(novos))
+    return novos, atualizado`,
+            "tests": `assert callable(ingerir_novos), 'Crie a função ingerir_novos(listados, checkpoint)'
+ck_inicial = ["a.json"]
+novos_t, ck_t = ingerir_novos(["a.json", "b.json", "c.json", "b.json"], ck_inicial)
+assert novos_t == ["b.json", "c.json"], 'Devolva só os arquivos ainda não processados, sem repetição'
+assert ck_t == ["a.json", "b.json", "c.json"], 'O checkpoint deve incluir os arquivos recém processados'
+assert ck_inicial == ["a.json"], 'Não altere o checkpoint recebido'
+novos2, ck2 = ingerir_novos(["a.json", "b.json", "c.json"], ck_t)
+assert novos2 == [] and ck2 == ck_t, 'Rodar de novo sem arquivos novos não deve reprocessar nada'
+print('4 verificações passaram.')`,
+            "e": "O checkpoint guarda o que já foi processado. Com ele, rodar o fluxo de novo é seguro e não duplica dados.",
+            "lv": "Prática de código · Python"
           }
         ],
         "studyCards": [
@@ -612,35 +934,35 @@ print('7 verificações passaram.')`
           {
             "p": "Qual é a diferença geral entre ETL e ELT?",
             "o": [
-              "ETL transforma antes de carregar; ELT carrega e transforma no destino.",
-              "ETL usa apenas Python e ELT apenas SQL.",
-              "ELT não precisa de dados de origem.",
-              "Não existe diferença de ordem entre as etapas."
+              "ETL carrega os dados antes de transformá-los; ELT transforma antes de extrair.",
+              "ETL transforma antes de carregar; ELT carrega primeiro e transforma no destino.",
+              "ETL só funciona com SQL; ELT só funciona com Python.",
+              "ETL serve para dados em lote; ELT elimina a etapa de extração."
             ],
-            "a": 0,
-            "e": "A distinção principal é a ordem em que transformação e carregamento acontecem."
+            "a": 1,
+            "e": "A distinção principal é a ordem em que a transformação e o carregamento acontecem. Ambos precisam extrair os dados da origem."
           },
           {
             "p": "O que significa tornar uma tarefa idempotente?",
             "o": [
-              "Executá-la novamente sem duplicar ou alterar indevidamente o resultado final.",
-              "Executá-la somente uma vez e apagar o código.",
-              "Impedir qualquer reprocessamento após uma falha.",
-              "Executar a tarefa sem registrar métricas."
+              "Executá-la uma única vez e bloquear qualquer nova tentativa.",
+              "Registrar um log detalhado de cada linha que ela processa, para poder auditar depois.",
+              "Poder reexecutá-la sem duplicar nem alterar indevidamente o resultado final.",
+              "Processar os dados sempre na mesma ordem em que chegaram."
             ],
-            "a": 0,
-            "e": "Idempotência torna reexecuções seguras, algo essencial em recuperação e operação."
+            "a": 2,
+            "e": "Idempotência torna reexecuções seguras, algo essencial em recuperação de falhas e em reprocessamentos."
           },
           {
             "p": "Qual métrica ajuda a identificar problemas de qualidade na ingestão?",
             "o": [
-              "Quantidade e proporção de registros rejeitados.",
-              "Número de cores usadas no dashboard.",
-              "Tamanho do nome do notebook.",
-              "Quantidade de abas abertas no navegador."
+              "A proporção de registros rejeitados pelas regras de validação.",
+              "O tempo médio de espera na fila do compute antes do início de cada execução.",
+              "O número de colunas da tabela de destino.",
+              "A quantidade de notebooks existentes no workspace."
             ],
             "a": 0,
-            "e": "Acompanhar rejeições e volumes permite identificar mudanças inesperadas na origem ou nas regras."
+            "e": "Acompanhar volume e taxa de rejeição revela mudanças inesperadas na origem ou nas regras de validação."
           }
         ],
         "studyCards": [
@@ -672,35 +994,68 @@ print('7 verificações passaram.')`
           {
             "p": "Qual é a hierarquia usual para identificar uma tabela no Unity Catalog?",
             "o": [
-              "catalogo.esquema.tabela.",
-              "tabela.catalogo.esquema.",
-              "workspace.cluster.tabela.",
-              "metastore.usuario.arquivo."
+              "esquema.catalogo.tabela",
+              "workspace.catalogo.tabela",
+              "catalogo.tabela.coluna",
+              "catalogo.esquema.tabela"
             ],
-            "a": 0,
-            "e": "A referência de três partes identifica catálogo, schema e objeto."
+            "a": 3,
+            "e": "A referência de três níveis identifica catálogo, schema e objeto, nessa ordem de contenção."
           },
           {
             "p": "O que recomenda o princípio do menor privilégio?",
             "o": [
-              "Conceder apenas as permissões necessárias para cada função.",
-              "Conceder acesso de administrador a todos os usuários.",
-              "Compartilhar credenciais para simplificar a operação.",
-              "Manter permissões antigas mesmo quando não são mais necessárias."
+              "Conceder a cada pessoa ou grupo só as permissões que a função exige.",
+              "Dar permissão total a um grupo e remover quando surgir um problema.",
+              "Compartilhar uma conta de serviço entre todos os projetos da equipe.",
+              "Manter permissões temporárias até a próxima auditoria anual."
             ],
             "a": 0,
-            "e": "Menor privilégio reduz exposição e limita o impacto de erros ou uso indevido."
+            "e": "Menor privilégio reduz a exposição e limita o impacto de erros ou de uso indevido."
           },
           {
-            "p": "Para que serve a linhagem de dados?",
+            "mode": "code",
+            "language": "Python",
+            "p": "Desafio de código: verifique permissões com herança na hierarquia catálogo.esquema.tabela.",
+            "task": "Implemente tem_permissao(grants, grupos, usuario, objeto, privilegio). grants é uma lista de tuplas (principal, objeto, privilegio). grupos é um dicionário usuario -> lista de grupos. Uma permissão vale se algum principal (o usuário ou um grupo dele) tiver o MESMO privilégio no próprio objeto ou em um objeto pai (herança: \"main\" cobre \"main.vendas.pedidos\"). Cuidado: \"main.vendas\" NÃO cobre \"main.vendas_old.t\". Sem concessão, a resposta é False. Devolva sempre um bool.",
+            "starter": `grants = [("analistas", "main.vendas", "SELECT"), ("ana", "main.rh", "SELECT")]
+grupos = {"ana": ["analistas"]}
+
+def tem_permissao(grants, grupos, usuario, objeto, privilegio):
+    # TODO: considere o usuário, seus grupos e a herança pelos objetos pai
+    return False
+
+print(tem_permissao(grants, grupos, "ana", "main.vendas.pedidos", "SELECT"))`,
+            "solution": `def tem_permissao(grants, grupos, usuario, objeto, privilegio):
+    principais = {usuario} | set(grupos.get(usuario, []))
+    for principal, alvo, priv in grants:
+        if principal in principais and priv == privilegio:
+            if objeto == alvo or objeto.startswith(alvo + "."):
+                return True
+    return False`,
+            "tests": `assert callable(tem_permissao), 'Crie a função tem_permissao(...)'
+g = [("analistas", "main.vendas", "SELECT"), ("ana", "main.rh", "SELECT"), ("ops", "main", "USE CATALOG")]
+gr = {"ana": ["analistas"], "caio": ["ops"]}
+assert tem_permissao(g, gr, "ana", "main.vendas.pedidos", "SELECT") is True, 'Grupo + herança deve permitir'
+assert tem_permissao(g, gr, "ana", "main.rh.salarios", "SELECT") is True, 'Concessão direta ao usuário deve valer'
+assert tem_permissao(g, gr, "ana", "main.vendas.pedidos", "MODIFY") is False, 'Privilégio diferente não vale'
+assert tem_permissao(g, gr, "caio", "main.vendas.pedidos", "SELECT") is False, 'Grupo ops não tem SELECT'
+assert tem_permissao(g, gr, "bia", "main.vendas", "SELECT") is False, 'Sem grupos nem concessão: negado'
+assert tem_permissao(g, gr, "ana", "main.vendas_old.t", "SELECT") is False, 'main.vendas não cobre main.vendas_old'
+print('6 verificações passaram.')`,
+            "e": "No Unity Catalog, permissões em um objeto pai são herdadas pelos filhos. O acesso é negado por padrão e o princípio do menor privilégio guia as concessões.",
+            "lv": "Prática de código · Python"
+          },
+          {
+            "p": "Para que serve a linhagem de dados (data lineage)?",
             "o": [
-              "Entender origem, transformações e dependências entre ativos.",
-              "Alterar automaticamente os valores de todas as tabelas.",
-              "Aumentar a memória do cluster.",
-              "Substituir as regras de acesso."
+              "Registrar quem fez login no workspace em cada dia.",
+              "Rastrear a origem, as transformações e as dependências entre tabelas.",
+              "Controlar quais colunas cada usuário pode consultar.",
+              "Medir o custo de computação de cada consulta executada, por usuário e por tabela."
             ],
-            "a": 0,
-            "e": "A linhagem ajuda a rastrear dependências e avaliar o impacto de mudanças."
+            "a": 1,
+            "e": "A linhagem mostra de onde um dado veio e quem depende dele, o que ajuda a avaliar o impacto de uma mudança."
           }
         ],
         "studyCards": [
@@ -725,37 +1080,87 @@ print('7 verificações passaram.')`
         "h": "## Automatizar tarefas\n\nJobs e Workflows permitem agendar e orquestrar tarefas de dados. Um workflow pode conter várias tarefas, dependências, parâmetros e configurações de execução, facilitando a organização de processos que antes eram disparados manualmente.\n\nUma tarefa pode executar notebook, script, consulta SQL ou outro tipo de atividade compatível com o ambiente. Defina dependências explícitas para que etapas ocorram na ordem correta.\n\n## Planejamento de execução\n\nConfigure agenda, parâmetros, compute e política de tentativas de acordo com a criticidade. Uma nova tentativa pode recuperar falhas transitórias, mas não corrige um erro permanente de lógica ou de dados.\n\n## Monitoramento\n\nAcompanhe duração, estado, logs e saída de cada tarefa. Configure notificações para falhas relevantes e mantenha instruções de recuperação. Não envie segredos em parâmetros visíveis ou logs.\n\n## Exemplo de fluxo\n\n1. Ingerir arquivos novos.\n2. Validar schema e qualidade.\n3. Atualizar tabelas Silver.\n4. Publicar agregações Gold.\n5. Notificar consumidores sobre a conclusão.\n\nO workflow deve ser testado com dados vazios, entradas duplicadas, falhas intermediárias e reexecução.",
         "q": [
           {
-            "p": "Qual é a principal finalidade de um Workflow?",
+            "p": "Qual é a principal finalidade de um Workflow (Job) no Databricks?",
             "o": [
-              "Orquestrar tarefas e suas dependências em um processo automatizado.",
-              "Substituir o Unity Catalog.",
-              "Armazenar arquivos de origem sem processamento.",
-              "Editar o tema visual dos notebooks."
+              "Guardar o código dos notebooks com controle de versão.",
+              "Definir quem pode ler as tabelas de cada catálogo.",
+              "Orquestrar tarefas e suas dependências em um processo automatizado e agendado.",
+              "Dimensionar automaticamente o armazenamento e o compute das tabelas Delta de cada projeto."
             ],
-            "a": 0,
-            "e": "Workflows coordenam tarefas, dependências, parâmetros e execução agendada."
+            "a": 2,
+            "e": "Workflows coordenam tarefas, dependências, parâmetros, agendamento e execução."
           },
           {
-            "p": "Por que configurar tentativas automáticas com cuidado?",
+            "p": "Por que configurar tentativas automáticas (retries) com cuidado?",
             "o": [
-              "Porque retries ajudam em falhas transitórias, mas não corrigem erros permanentes.",
-              "Porque toda falha deve repetir infinitamente.",
-              "Porque retries substituem testes de qualidade.",
-              "Porque retries removem a necessidade de logs."
+              "Porque corrigem qualquer tipo de falha, desde que o limite de tentativas configurado seja alto.",
+              "Porque substituem as validações de qualidade na entrada dos dados.",
+              "Porque só funcionam em tarefas SQL, nunca em notebooks.",
+              "Porque ajudam em falhas transitórias, mas não corrigem erros de lógica ou de dados."
             ],
-            "a": 0,
-            "e": "Tentativas são úteis para falhas temporárias; erros de lógica exigem correção."
+            "a": 3,
+            "e": "Uma nova tentativa recupera falhas temporárias (rede, indisponibilidade). Um erro permanente precisa de correção."
           },
           {
             "p": "O que deve ser monitorado em um job de produção?",
             "o": [
-              "Estado, duração, logs, falhas e métricas relevantes da execução.",
-              "Apenas o nome do notebook.",
-              "Somente o tema escuro ou claro.",
-              "A quantidade de abas do browser."
+              "Somente se o job terminou, sem olhar duração nem logs.",
+              "Estado, duração, logs e falhas de cada tarefa, com alerta para o que for relevante.",
+              "Apenas o custo total do mês e o número de execuções, sem nenhum detalhe de cada tarefa.",
+              "O número de linhas de código de cada notebook."
             ],
-            "a": 0,
-            "e": "Essas informações ajudam a detectar atrasos, falhas e mudanças de comportamento."
+            "a": 1,
+            "e": "Esses sinais mostram atrasos, falhas e mudanças de comportamento antes que o consumidor do dado perceba."
+          },
+          {
+            "mode": "code",
+            "language": "Python",
+            "p": "Desafio de código: calcule a ordem de execução das tarefas de um workflow.",
+            "task": "Implemente ordem_execucao(tarefas). tarefas é um dicionário nome -> lista de dependências. Devolva a lista de nomes em uma ordem válida (cada tarefa só depois das suas dependências). Quando várias tarefas estiverem prontas ao mesmo tempo, escolha a de menor nome em ordem alfabética. Levante ValueError se existir dependência de uma tarefa que não existe ou se houver ciclo.",
+            "starter": `tarefas = {
+    "ingerir": [],
+    "validar": ["ingerir"],
+    "atualizar_silver": ["validar"],
+    "publicar_gold": ["atualizar_silver"],
+}
+
+def ordem_execucao(tarefas):
+    # TODO: ordene respeitando as dependências e detecte problemas
+    return list(tarefas)
+
+print(ordem_execucao(tarefas))`,
+            "solution": `def ordem_execucao(tarefas):
+    for nome, deps in tarefas.items():
+        for dep in deps:
+            if dep not in tarefas:
+                raise ValueError("Dependência inexistente: " + dep)
+    pendentes = {nome: set(deps) for nome, deps in tarefas.items()}
+    ordem = []
+    while pendentes:
+        prontas = sorted(n for n, deps in pendentes.items() if not deps)
+        if not prontas:
+            raise ValueError("Ciclo entre as tarefas")
+        escolhida = prontas[0]
+        ordem.append(escolhida)
+        del pendentes[escolhida]
+        for deps in pendentes.values():
+            deps.discard(escolhida)
+    return ordem`,
+            "tests": `assert callable(ordem_execucao), 'Crie a função ordem_execucao(tarefas)'
+t1 = {"publicar_gold": ["atualizar_silver"], "ingerir": [], "validar": ["ingerir"], "atualizar_silver": ["validar"], "notificar": ["publicar_gold"]}
+assert ordem_execucao(t1) == ["ingerir", "validar", "atualizar_silver", "publicar_gold", "notificar"], 'Respeite a cadeia de dependências'
+assert ordem_execucao({"c": ["a", "b"], "b": [], "a": []}) == ["a", "b", "c"], 'Tarefas prontas saem em ordem alfabética'
+def _falha(t):
+    try:
+        ordem_execucao(t)
+    except ValueError:
+        return True
+    return False
+assert _falha({"a": ["b"], "b": ["a"]}), 'Ciclo deve levantar ValueError'
+assert _falha({"a": ["x"]}), 'Dependência inexistente deve levantar ValueError'
+print('4 verificações passaram.')`,
+            "e": "Um workflow é um grafo de tarefas sem ciclos. A ordem de execução vem das dependências, e ciclos ou dependências inexistentes precisam ser rejeitados antes de rodar.",
+            "lv": "Prática de código · Python"
           }
         ],
         "studyCards": [
@@ -780,37 +1185,72 @@ print('7 verificações passaram.')`
         "h": "## Segurança operacional\n\nProteja credenciais usando mecanismos de secrets e identidades gerenciadas disponíveis no ambiente. Evite inserir tokens em notebooks, arquivos versionados, parâmetros abertos ou mensagens de log.\n\nSepare ambientes de desenvolvimento, homologação e produção quando o risco e o processo exigirem. Restrinja permissões, monitore acessos e estabeleça procedimentos para rotação de credenciais.\n\n## Monitoramento de custos\n\nCompute, armazenamento e transferências podem gerar custos diferentes. Acompanhe utilização, duração dos jobs, concorrência e recursos ociosos. Tags e convenções de nomes ajudam a atribuir custos a equipes e produtos.\n\n## Observabilidade de pipelines\n\nUma operação madura acompanha métricas técnicas e de negócio: volume ingerido, atraso, registros rejeitados, duração, falhas e atualização mais recente. Defina limites e alertas com base no comportamento esperado.\n\n## Resposta a incidentes\n\nQuando um pipeline falhar, identifique o ponto da falha, preserve logs, avalie impacto nos consumidores e siga o procedimento de recuperação. Antes de reprocessar, confirme se a operação é idempotente e se não haverá duplicação.\n\n## Checklist de produção\n\n- Segredos fora do código.\n- Permissões revisadas.\n- Alertas acionáveis.\n- Logs sem dados sensíveis.\n- Custos e recursos ociosos acompanhados.\n- Procedimento de rollback e reprocessamento documentado.",
         "q": [
           {
-            "p": "Onde devem ser armazenados tokens e credenciais usados por pipelines?",
+            "p": "Onde devem ser guardados tokens e credenciais usados por pipelines?",
             "o": [
-              "Em um mecanismo seguro de secrets ou identidade gerenciada.",
-              "Diretamente no código-fonte público.",
-              "Em células Markdown compartilhadas.",
-              "No nome do cluster."
+              "Em um secret scope ou em identidade gerenciada, fora do código.",
+              "Em um arquivo de configuração versionado junto ao código.",
+              "Em um parâmetro do job, visível na tela de execuções.",
+              "Em variáveis do notebook, escondidas na saída das células."
             ],
             "a": 0,
-            "e": "Secrets e identidades gerenciadas reduzem exposição de credenciais."
+            "e": "Secrets e identidades gerenciadas reduzem a exposição. Parâmetros, logs e repositórios acabam espalhando a credencial."
           },
           {
-            "p": "Qual indicador pode revelar atraso em um pipeline de ingestão?",
-            "o": [
-              "Tempo desde a chegada do dado até sua disponibilidade para consumo.",
-              "Quantidade de comentários no notebook.",
-              "Número de cores de um dashboard.",
-              "Comprimento do nome da tabela."
-            ],
-            "a": 0,
-            "e": "Atraso ou freshness mede quanto tempo os dados levam para chegar ao consumidor."
+            "mode": "code",
+            "language": "Python",
+            "p": "Desafio de código: gere alertas de frescor para tabelas com ingestão atrasada.",
+            "task": "Implemente alertas_de_frescor(tabelas, agora, limite_min). tabelas é um dicionário nome -> data/hora da última ingestão no formato \"AAAA-MM-DD HH:MM\"; agora usa o mesmo formato. Devolva a lista ORDENADA dos nomes cujo atraso seja MAIOR que limite_min minutos (atraso exatamente igual ao limite não alerta). Dica: use datetime.strptime.",
+            "starter": `from datetime import datetime
+
+tabelas = {"vendas": "2026-11-23 08:00", "clientes": "2026-11-23 09:50"}
+
+def alertas_de_frescor(tabelas, agora, limite_min):
+    # TODO: calcule o atraso de cada tabela em minutos
+    return []
+
+print(alertas_de_frescor(tabelas, "2026-11-23 10:00", 60))`,
+            "solution": `from datetime import datetime
+
+def alertas_de_frescor(tabelas, agora, limite_min):
+    formato = "%Y-%m-%d %H:%M"
+    instante = datetime.strptime(agora, formato)
+    alertas = []
+    for nome, ultima in tabelas.items():
+        atraso = (instante - datetime.strptime(ultima, formato)).total_seconds() / 60
+        if atraso > limite_min:
+            alertas.append(nome)
+    return sorted(alertas)`,
+            "tests": `assert callable(alertas_de_frescor), 'Crie a função alertas_de_frescor(tabelas, agora, limite_min)'
+tb = {"vendas": "2026-11-23 08:00", "clientes": "2026-11-23 09:50", "estoque": "2026-11-22 23:00"}
+assert alertas_de_frescor(tb, "2026-11-23 10:00", 60) == ["estoque", "vendas"], 'vendas (120 min) e estoque (660 min) passam de 60'
+assert alertas_de_frescor(tb, "2026-11-23 10:00", 120) == ["estoque"], 'Atraso igual ao limite não alerta'
+assert alertas_de_frescor(tb, "2026-11-23 10:00", 1000) == [], 'Nenhuma tabela passa de 1000 min'
+assert alertas_de_frescor({}, "2026-11-23 10:00", 10) == [], 'Sem tabelas, sem alertas'
+print('4 verificações passaram.')`,
+            "e": "Frescor é a métrica mais direta de atraso. Alertar quando ele passa de um limite transforma monitoramento em ação.",
+            "lv": "Prática de código · Python"
           },
           {
-            "p": "O que verificar antes de reprocessar uma tarefa após incidente?",
+            "p": "Qual indicador pode revelar que um pipeline de ingestão está atrasado?",
             "o": [
-              "Se a execução é idempotente e se a repetição pode duplicar efeitos.",
-              "Se o tema do site está atualizado.",
-              "Se o notebook tem título em caixa alta.",
-              "Se a janela do navegador está maximizada."
+              "A taxa de nulos: proporção de valores ausentes em cada coluna.",
+              "O frescor: tempo entre a chegada do dado e sua disponibilidade para consumo.",
+              "A cardinalidade: quantidade de valores distintos de cada coluna da tabela de destino.",
+              "O tamanho médio dos arquivos Parquet de cada partição."
             ],
-            "a": 0,
-            "e": "A análise de idempotência evita duplicações e efeitos colaterais durante a recuperação."
+            "a": 1,
+            "e": "Frescor (freshness) mede quanto tempo os dados levam para chegar ao consumidor e é o principal sinal de atraso."
+          },
+          {
+            "p": "O que verificar antes de reprocessar uma tarefa depois de um incidente?",
+            "o": [
+              "Se o cluster tem mais núcleos e mais memória do que tinha na execução original.",
+              "Se o notebook foi alterado depois da última sexta-feira.",
+              "Se a tarefa é idempotente e se repetir a execução pode duplicar efeitos.",
+              "Se o dashboard já foi atualizado manualmente por alguém."
+            ],
+            "a": 2,
+            "e": "Sem idempotência, reprocessar pode duplicar linhas, e-mails ou cobranças. Essa análise vem antes de qualquer reexecução."
           }
         ],
         "studyCards": [
@@ -882,6 +1322,81 @@ const acharAula = (id) => aulas().find((l) => l.id === id) || null;
 const indiceModulo = (aula) => S.mods.findIndex((m) => m.l.includes(aula));
 const moduloDe = (aula) => S.mods[indiceModulo(aula)];
 
+/* Enunciados das questões padrão anteriores (todas com a resposta em A).
+   Servem só para reconhecer o que deve ser substituído na migração abaixo. */
+const PROMPTS_PADRAO_ANTIGOS = new Set([
+  "Qual é a ideia central de uma arquitetura Lakehouse?",
+  "Qual recurso do Delta Lake ajuda a oferecer transações confiáveis sobre arquivos?",
+  "Por que separar armazenamento e compute pode ser vantajoso?",
+  "Qual é a função de um workspace no Databricks?",
+  "O que fornece capacidade para executar o código de um notebook?",
+  "Qual prática é recomendada para notebooks usados em produção?",
+  "Qual é a principal finalidade da camada Bronze?",
+  "Em qual camada normalmente são aplicadas padronização e deduplicação?",
+  "Qual camada costuma servir indicadores e análises de negócio?",
+  "Qual componente registra as transações de uma tabela Delta?",
+  "Qual modo de escrita adiciona novos registros sem substituir os existentes?",
+  "Por que usar overwrite exige cuidado?",
+  "Qual cláusula filtra linhas antes da agregação?",
+  "Qual cláusula reúne registros para calcular agregações por categoria?",
+  "O que deve ser verificado antes de combinar duas tabelas com JOIN?",
+  "Para que serve o comando MERGE INTO em Delta Lake?",
+  "O que deve ser garantido na origem antes de um MERGE por chave?",
+  "Qual é um risco de permitir evolução de esquema sem governança?",
+  "Qual das opções é uma ação que normalmente dispara a execução de um DataFrame?",
+  "Por que collect() deve ser usado com cuidado em grandes DataFrames?",
+  "Qual prática costuma favorecer a otimização de consultas PySpark?",
+  "Qual é o principal objetivo do Auto Loader?",
+  "Qual é a função do checkpoint em um fluxo de ingestão?",
+  "Onde deve ficar o checkpoint de um pipeline de produção?",
+  "Desafio de código: normalize os dados de clientes antes de publicar a camada Silver.",
+  "Qual é a diferença geral entre ETL e ELT?",
+  "O que significa tornar uma tarefa idempotente?",
+  "Qual métrica ajuda a identificar problemas de qualidade na ingestão?",
+  "Qual é a hierarquia usual para identificar uma tabela no Unity Catalog?",
+  "O que recomenda o princípio do menor privilégio?",
+  "Para que serve a linhagem de dados?",
+  "Qual é a principal finalidade de um Workflow?",
+  "Por que configurar tentativas automáticas com cuidado?",
+  "O que deve ser monitorado em um job de produção?",
+  "Onde devem ser armazenados tokens e credenciais usados por pipelines?",
+  "Qual indicador pode revelar atraso em um pipeline de ingestão?",
+  "O que verificar antes de reprocessar uma tarefa após incidente?"
+]);
+const CHAVE_QUESTOES_V2 = "dbAcademyQuestoesBalanceadasV2";
+
+/* Troca as questões padrão antigas pelas novas (gabarito balanceado + desafio de código
+   em cada aula). Questões criadas pelo usuário ou pela IA são preservadas, e o progresso é
+   zerado apenas nas aulas cujas questões mudaram, pois os índices deixam de coincidir. */
+function migrarQuestoesPadrao() {
+  if (armazem.bruto(CHAVE_QUESTOES_V2) === "1") return;
+  const progresso = armazem.ler(K.progresso, {}) || {};
+  const stats = armazem.ler(K.stats, {}) || {};
+  const rascunhos = armazem.ler(K.rascunhos, {}) || {};
+  const marcas = armazem.ler(K.marcas, null);
+  let mudou = false, marcasMudaram = false;
+  for (const origem of CONTEUDO_PADRAO.flatMap((m) => m.l)) {
+    const destino = acharAula(origem.id);
+    if (!destino || !Array.isArray(destino.q) || !destino.q.some((q) => PROMPTS_PADRAO_ANTIGOS.has(q && q.p))) continue;
+    /* A assinatura inclui as alternativas (ou a solução), pois alguns enunciados não mudaram. */
+    const assinatura = (q) => (q && q.p) + "||" + (q && Array.isArray(q.o) ? q.o.join("|") + "#" + q.a : (q && q.solution) || "");
+    const novas = new Set(origem.q.map(assinatura));
+    if (origem.q.every((q) => destino.q.some((d) => assinatura(d) === assinatura(q)))) continue; /* aula já está na versão nova */
+    const extras = destino.q.filter((q) => !PROMPTS_PADRAO_ANTIGOS.has(q && q.p) && !novas.has(assinatura(q)));
+    destino.q = clone(origem.q).concat(extras);
+    delete progresso[destino.id]; delete stats[destino.id];
+    Object.keys(rascunhos).forEach((k) => { if (k.startsWith(destino.id + ":")) delete rascunhos[k]; });
+    if (isObj(marcas) && isObj(marcas.questions)) Object.keys(marcas.questions).forEach((k) => { if (k.startsWith(destino.id + ":q:")) { delete marcas.questions[k]; marcasMudaram = true; } });
+    mudou = true;
+  }
+  if (mudou) {
+    armazem.gravar(K.conteudo, S.mods);
+    armazem.gravar(K.progresso, progresso); armazem.gravar(K.stats, stats); armazem.gravar(K.rascunhos, rascunhos);
+    if (marcasMudaram) armazem.gravar(K.marcas, marcas);
+  }
+  armazem.gravar(CHAVE_QUESTOES_V2, "1");
+}
+
 const VERSAO_CURRICULO = "2026-11-20-trilha-ampliada-v1";
 let trilhaRecriada = false;
 function carregarConteudo() {
@@ -892,6 +1407,7 @@ function carregarConteudo() {
     S.mods = clone(CONTEUDO_PADRAO);
     armazem.gravar(K.conteudo, S.mods);
     armazem.gravar(K.curriculo, VERSAO_CURRICULO);
+    armazem.gravar(CHAVE_QUESTOES_V2, "1");
     armazem.apagar(K.progresso);
     armazem.apagar(K.stats);
     armazem.apagar(K.marcas);
@@ -913,6 +1429,7 @@ function carregarConteudo() {
     }
     armazem.gravar(chaveMigracaoIDE, "1");
   }
+  migrarQuestoesPadrao();
 }
 function salvarConteudo(msgOk) {
   if (!conteudoValido(S.mods)) { aviso("O conteúdo não passou na validação; nada foi salvo.", true); return false; }
@@ -2927,6 +3444,7 @@ Object.assign(App, {
   instrucaoNivel, nivelAtual, normalizarAjustes, aplicarAjustes, salvarAjustes, aplicarPaleta, aplicarDesenho, desenharTema,
   PALETAS, DESENHOS, FUNDOS, CURSORES, LUZES, FONTES, CAMADAS, render, desenharIndice, normalizarMapa, limpar,
   aulaAtual: () => acharAula(S.rota),
+  executarPython: (codigo, opcoes) => python.executar(codigo, opcoes),
   idAulaUnico(titulo) { const base = slug(titulo) || "aula"; let id = base, n = 2; while (acharAula(id)) id = base + "-" + n++; return id; },
   testes: { estatisticas, normalizarAjustes, conteudoValido, layoutMapa, quebrar, faixaCalor, matrizSkills, normalizarProgresso, normalizarStats, textoSeguro }
 });

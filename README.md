@@ -24,8 +24,8 @@ O projeto combina aulas estruturadas (Lakehouse, Delta Lake, PySpark, Spark SQL,
 ### Atualizações Recentes (Changelog)
 
 #### 20/11/2026 — Nova Trilha e Melhorias no Datrics
-* **Reestruturação da Trilha:** A trilha padrão foi recriada em **4 módulos e 12 aulas** (totalizando 36 questões e 24 cards de estudo) seguindo o formato estruturado do Datrics. Na primeira abertura desta versão, o progresso antigo é migrado/substituído uma única vez, preservando temas, configurações, chaves de API e backups.
-* **Geração de Módulos e Questões:** Múltipla escolha definida como padrão para evitar falhas de validação em exercícios de código automáticos. Reconhecimento de Python/Pandas/NumPy/Matplotlib/Jupyter como domínio próprio (sem forçar contexto Databricks) e parser/validação mais flexíveis, garantindo o salvamento da aula mesmo se a API falhar na geração de questões.
+* **Reestruturação da Trilha:** A trilha padrão foi recriada em **4 módulos e 12 aulas** (totalizando 48 questões, sendo 36 objetivas e 12 desafios de código, e 24 cards de estudo) seguindo o formato estruturado do Datrics. Na primeira abertura desta versão, o progresso antigo é migrado/substituído uma única vez, preservando temas, configurações, chaves de API e backups.
+* **Geração de Módulos e Questões:** o padrão agora é **automático e misto**: sem o usuário especificar nada, cada conjunto gerado tem objetivas e pelo menos 1 exercício de código (IDE) a cada 5 questões, em posições variadas. Se o modelo falhar ao gerar o código, o Datrics tenta até 3 vezes antes de usar uma objetiva no lugar. Os testes gerados pela IA só são aceitos se a solução de referência passar neles e o código inicial falhar. Pedidos explícitos (por exemplo, só conceitual) continuam sendo respeitados. Reconhecimento de Python/Pandas/NumPy/Matplotlib/Jupyter como domínio próprio (sem forçar contexto Databricks) e parser/validação mais flexíveis, garantindo o salvamento da aula mesmo se a API falhar na geração de questões.
 * **Mapas Mentais Verificados:** Inclusão de pesquisa web obrigatória antes da geração/edição de mapas mentais, compartilhando o contexto com os provedores de *fallback* e bloqueando a criação caso nenhuma fonte confiável seja recuperada.
 * **Interface:** Área de toque ampliada e melhor alinhamento no botão de fechar do Datrics em telas estreitas, além de avisos recomendando backup antes de edições estruturais no Editor.
 
@@ -55,6 +55,10 @@ It pairs structured lessons (Lakehouse, Delta Lake, PySpark, Spark SQL, Auto Loa
 * **Module & Question Generation:** Set multiple-choice as the default format to prevent validation failures in auto-generated coding tasks. Added native domain recognition for Python/Pandas/NumPy/Matplotlib/Jupyter (without forcing Databricks context), broadened JSON parser/validation rules, and ensured lessons save safely with a warning even if question generation fails after retries.
 * **Fact-Checked Mind Maps:** Enforced mandatory web search prior to generating or updating mind maps, sharing retrieved context across fallback providers and halting generation if no verifiable sources can be retrieved.
 * **UI & UX Refinements:** Enlarged touch target and fixed header alignment for the Datrics close button on narrow screens, and added backup recommendations before major changes in the Editor.
+
+## Questões padrão e gabarito
+
+As 36 questões objetivas da trilha têm o gabarito distribuído por igual entre A, B, C e D (9 de cada), com alternativas erradas plausíveis e de tamanho parecido, para que a resposta não possa ser deduzida pela posição nem pelo tamanho do texto. Cada aula tem ainda 1 desafio de código em Python com testes executáveis. Quem já usava a versão anterior recebe as questões novas automaticamente, uma única vez (`dbAcademyQuestoesBalanceadasV2`): questões criadas por você ou pela IA são preservadas, e o progresso é zerado apenas nas aulas cujas questões mudaram.
 
 ## Adicionar questões a um módulo existente
 

@@ -554,7 +554,26 @@ function validarPratica(x) {
   const linguagem = String(x.linguagem || x.language || "Python").trim();
   const solucao = x.solucao || x.solution || x.resposta || x.codigoSolucao;
   if (!String(enunciado || "").trim() || !["SQL", "Python", "PySpark"].includes(linguagem) || !String(solucao || "").trim()) return null;
-  return { mode: "code", language: linguagem, p: esc(String(enunciado).trim()), task: String(x.instrucoes || x.instructions || x.tarefa || ""), starter: String(x.codigoInicial || x.starter || x.codigo_inicial || ""), solution: String(solucao), e: String(x.e || x.explicacao || x.explanation || ""), lv: "Prática de código · " + linguagem, _raw: String(enunciado).trim() };
+  const inicial = String(x.codigoInicial || x.starter || x.codigo_inicial || "");
+  /* O código inicial nunca pode já conter a resposta. */
+  if (normCmp(inicial).length > 20 && normCmp(inicial).includes(normCmp(solucao))) return null;
+  const testes = linguagem === "Python" ? String(x.testes || x.tests || "").trim() : "";
+  return { mode: "code", language: linguagem, p: esc(String(enunciado).trim()), task: String(x.instrucoes || x.instructions || x.tarefa || ""), starter: inicial, solution: String(solucao), tests: testes, e: String(x.e || x.explicacao || x.explanation || ""), lv: "Prática de código · " + linguagem, _raw: String(enunciado).trim() };
+}
+/* Os testes gerados pela IA só entram se forem confiáveis: a solução de referência precisa passar
+   neles e o código inicial precisa falhar. Caso contrário a questão fica sem testes (avaliação por IA). */
+async function validarTestesIDE(q) {
+  if (q.language !== "Python" || !q.tests) { q.tests = ""; return q; }
+  try {
+    if (!App.executarPython) throw new Error("sem executor");
+    const ok = await App.executarPython(q.solution, { testes: q.tests, tempo: 20000 });
+    if (!ok.ok) throw new Error("a solução não passou");
+    if (q.starter.trim()) {
+      const ini = await App.executarPython(q.starter, { testes: q.tests, tempo: 20000 });
+      if (ini.ok) throw new Error("o código inicial já passa");
+    }
+  } catch (_) { q.tests = ""; }
+  return q;
 }
 function promptQuestoes(cfg, n, modo, anteriores) {
   const pegadinha = cfg.pegadinhas ? "Inclua pegadinhas justas: detalhes pequenos e relevantes que mudam a resposta; não use ambiguidade nem informação escondida." : "Não inclua pegadinhas; formule questões diretas e sem detalhes traiçoeiros.";
@@ -562,7 +581,9 @@ function promptQuestoes(cfg, n, modo, anteriores) {
   const extra = cfg.extra ? "\nInstruções e material de referência do aluno:\n" + cfg.extra.slice(0, 6500) : "";
   const base = "Tema: " + cfg.tema + ". Dificuldade: " + cfg.dif + ". Linguagem do código: " + cfg.ling + "." + (cfg.ling === "Python" ? " O contexto principal é Python e ciência de dados; não force exemplos de Databricks se não forem pertinentes." : "") + extra + evitar + "\n" + pegadinha;
   if (modo === "ide") return base + "\nCrie " + n + " exercício(s) de prática de código em que o aluno escreve ou completa o código. A solução de referência deve ser completa e NÃO pode aparecer no objetivo, nas instruções nem no código inicial.\n" +
-    'Responda somente com o JSON: [{"tipo":"Prática de código","linguagem":"SQL|Python|PySpark","p":"objetivo curto","instrucoes":"requisitos detalhados","codigoInicial":"esqueleto incompleto opcional","solucao":"solução de referência completa","e":"conceito praticado"}]';
+    "PREFIRA linguagem Python: o exercício deve ser resolvível em Python puro (sem pyspark, sem bibliotecas externas, sem arquivos nem rede), simulando o conceito do tema com listas e dicionários e pedindo uma função com nome e assinatura definidos nas instruções. Use SQL apenas se o tema for consulta SQL. Evite PySpark, que não executa no navegador.\n" +
+    'Para Python, inclua \"testes\": 3 a 6 linhas de assert que chamam a função pedida, com mensagens curtas em português, cobrindo caso normal e caso limite, terminando com um print. Os testes devem passar com a solução e FALHAR com o código inicial. Não use open, eval, exec, compile, import os/sys nem while True.\n' +
+    'Responda somente com o JSON: [{"tipo":"Prática de código","linguagem":"Python|SQL|PySpark","p":"objetivo curto","instrucoes":"requisitos detalhados com o nome da função","codigoInicial":"esqueleto incompleto que roda sem erro","solucao":"solução de referência completa","testes":"asserts em Python (vazio se não for Python)","e":"conceito praticado"}]';
   const tipo = cfg.tipo === "Misto" ? "Conceitual, Código ou Cenário" : cfg.tipo === "Código (SQL/PySpark)" ? "Código" : cfg.tipo === "Cenário prático" ? "Cenário" : "Conceitual";
   return base + "\nCrie " + n + " questão(ões) de múltipla escolha do tipo " + tipo + ", em português do Brasil, sempre no contexto Databricks. Exatamente 4 alternativas e exatamente 1 correta. Enunciados e alternativas curtos. Cenário: situação real de trabalho e a melhor decisão técnica. Conceitual: compreensão e aplicação, não decoreba. Código: trecho neutro ou esqueleto incompleto que não entregue a resposta; sem código use \"codigo\":\"\". Alternativas com texto completo e significativo — nunca apenas \"A\", \"B\", \"Alternativa A\" ou \"Opção B\". Distratores plausíveis. Varie a posição da correta.\n" +
     'Responda somente com o JSON: {"questions":[{"nivel":"Fácil|Médio|Difícil","tipo":"Conceitual|Código|Cenário","p":"enunciado","codigo":"","o":["texto completo da alternativa 1","texto completo da alternativa 2","texto completo da alternativa 3","texto completo da alternativa 4"],"a":0,"correta":"copie exatamente o texto da alternativa correta","e":"explique por que a correta é certa e as demais não"}]}. "a" é inteiro de 0 a 3.';
@@ -580,11 +601,12 @@ function extrairItensGeracao(texto) {
   return Array.isArray(arr.itens) ? arr.itens : [];
 }
 async function lote(cfg, n, modo, anteriores, sinal) {
-  const r = await pedir({ rotulo: "Gerar questões", json: true, temperature: 0.35, signal: sinal, max_tokens: (modo === "ide" ? 900 : 700) * n + 450,
+  const r = await pedir({ rotulo: "Gerar questões", json: true, temperature: 0.35, signal: sinal, max_tokens: (modo === "ide" ? 1500 : 700) * n + 450,
     system: (cfg.ling === "Python" ? "Você é o Datrics, professor especialista em Python e ciência de dados." : "Você é o Datrics, gerador de questões desta apostila de Databricks. " + ESCOPO) + " Gere exatamente o formato solicitado. Responda somente JSON válido, sem markdown ou texto externo.",
     messages: [{ role: "user", content: promptQuestoes(cfg, n, modo, anteriores) }] });
   const itens = extrairItensGeracao(r);
   const validadas = itens.map((x) => modo === "ide" ? validarPratica(x) : validarMultipla(x, cfg)).filter(Boolean).slice(0, n);
+  if (modo === "ide") for (const q of validadas) await validarTestesIDE(q);
   return validadas;
 }
 async function gerarCards(cfg, aula, sinal) {
@@ -628,20 +650,44 @@ const salvarOrq = () => armazem.gravar(KC.orq, { mode: "automatic", finalReview:
 const lerTrabalho = () => { const t = armazem.ler(KC.trabalho, null); return isObj(t) && t.version === 1 && ["question-generation", "tutor-study-lesson", "tutor-questions"].includes(t.kind) && t.status !== "completed" ? t : null; };
 function gravarTrabalho(t) { t.updatedAt = new Date().toISOString(); if (!armazem.gravar(KC.trabalho, t)) aviso("Não consegui salvar o ponto de retomada; se fechar a página, o trabalho em andamento se perde.", true); }
 const limparTrabalho = () => armazem.apagar(KC.trabalho);
-function planoMisto(n, ja) { const ciclo = ["mc", "ide", "mc", "ide", "mc"]; return ciclo[ja % ciclo.length]; }
+/* Plano automático: a cada 5 questões há pelo menos 1 de código (IDE); as demais são objetivas.
+   Os exercícios de código ficam espalhados em posições variadas, e não sempre no fim. */
+function planoQuestoes(qtd) {
+  const plano = Array(Math.max(0, qtd)).fill("mc");
+  if (qtd < 2) return plano;
+  const codigos = Math.ceil(qtd / 5), faixa = qtd / codigos;
+  for (let k = 0; k < codigos; k++) {
+    let pos = Math.min(qtd - 1, Math.floor(k * faixa + Math.random() * faixa));
+    while (plano[pos] === "ide" && pos < qtd - 1) pos++;
+    plano[pos] = "ide";
+  }
+  return plano;
+}
+const TIPOS_AUTOMATICOS = ["Misto", "Múltipla escolha"];
 
 /* Gera as questões de uma parte do trabalho, em lotes pequenos e retomáveis. */
 async function encherQuestoes(t, parte, progresso, sinal) {
   let vazios = 0;
+  const automatico = TIPOS_AUTOMATICOS.includes(t.cfg.tipo);
+  if (automatico && !Array.isArray(parte.plano)) parte.plano = planoQuestoes(parte.qtd);
   while (parte.all.length < parte.qtd) {
     const falta = parte.qtd - parte.all.length;
-    const modo = t.cfg.tipo === "Prática de código (IDE)" ? "ide" : t.cfg.tipo === "Misto" ? planoMisto(falta, parte.all.length) : "mc";
-    const n = t.cfg.tipo === "Misto" ? 1 : Math.min(falta, modo === "ide" ? 2 : 5);
-    progresso("Gerando questões " + (parte.all.length + 1) + "–" + (parte.all.length + n) + " de " + parte.qtd + (parte.titulo ? " · " + parte.titulo : "") + "…");
+    const modo = t.cfg.tipo === "Prática de código (IDE)" ? "ide" : automatico ? (parte.plano[parte.all.length] || "mc") : "mc";
+    /* Agrupa as próximas posições do mesmo tipo em uma única chamada. */
+    let n = 1;
+    if (automatico) { while (n < falta && (parte.plano[parte.all.length + n] || "mc") === modo) n++; }
+    else n = falta;
+    n = Math.min(n, modo === "ide" ? 2 : 5);
+    progresso("Gerando questões " + (parte.all.length + 1) + "–" + (parte.all.length + n) + " de " + parte.qtd + (parte.titulo ? " · " + parte.titulo : "") + (modo === "ide" ? " (código)" : "") + "…");
     const cfgParte = Object.assign({}, t.cfg, parte.contexto ? { tema: t.cfg.tema + " — " + parte.contexto } : {});
     let novas = await lote(cfgParte, n, modo, t.anteriores, sinal);
+    /* O exercício de código é obrigatório (pelo menos 1 a cada 5): tenta até 3 vezes antes de desistir. */
+    for (let tentativa = 2; tentativa <= 3 && !novas.length && modo === "ide"; tentativa++) {
+      progresso("Tentando de novo o exercício de código (tentativa " + tentativa + " de 3)…");
+      novas = await lote(cfgParte, n, "ide", t.anteriores, sinal);
+    }
     if (!novas.length && modo === "ide") {
-      progresso("Ajustando o formato da atividade e tentando novamente…");
+      progresso("Não saiu o exercício de código; usando uma questão objetiva no lugar…");
       novas = await lote(cfgParte, n, "mc", t.anteriores, sinal);
     }
     if (!novas.length) {
@@ -960,7 +1006,7 @@ async function criarConteudo(texto) {
   const total = RX.questoes.test(texto) || ehModulo || RX.criarAula.test(texto) ? quantidade(texto, 5) : 0;
   const base = ehModulo ? partesDoModulo(texto, tema) : [[tema, "introdução e conceitos centrais"]];
   const partes = base.map(([titulo, contexto], i) => ({ titulo, contexto, qtd: Math.floor(total / base.length) + (i < total % base.length ? 1 : 0), all: [], intro: "Aula sobre " + tema + " com foco em " + contexto + ". Leia os cards antes de praticar." }));
-  const cfg = { tema, dif: dificuldade(texto), tipo: "Múltipla escolha", ling: linguagem(texto), extra: String(texto || "").slice(0, 6500), pegadinhas: false, cards: true };
+  const cfg = { tema, dif: dificuldade(texto), tipo: "Misto", ling: linguagem(texto), extra: String(texto || "").slice(0, 6500), pegadinhas: false, cards: true };
   const t = novoTrabalho("tutor-study-lesson", cfg, partes, { modulo: ehModulo });
   const alvo = await executarTrabalho(t, statusChat, controleAtivo.signal);
   return (ehModulo ? "Módulo **" + tema + "** criado com " + partes.length + " aulas" : "Aula **" + tema + "** criada") + (total ? " e " + total + " questões" : "") + ". Comece por [" + alvo.t + "](#" + encodeURIComponent(alvo.id) + ").";
